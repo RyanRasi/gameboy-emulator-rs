@@ -1,0 +1,9 @@
+[package]
+name = "web"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+core = { path = "../core" }
+log = "0.4"
+env_logger = "0.11"

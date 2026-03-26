@@ -1,0 +1,7 @@
+/Users/emilyjames/Documents/Pookie/gameboy-emulator-rs/target/debug/deps/core-0b4848a685b75be7.d: core/src/lib.rs
+
+/Users/emilyjames/Documents/Pookie/gameboy-emulator-rs/target/debug/deps/libcore-0b4848a685b75be7.rlib: core/src/lib.rs
+
+/Users/emilyjames/Documents/Pookie/gameboy-emulator-rs/target/debug/deps/libcore-0b4848a685b75be7.rmeta: core/src/lib.rs
+
+core/src/lib.rs:

@@ -1,0 +1,1 @@
+/Users/emilyjames/Documents/Pookie/gameboy-emulator-rs/target/debug/desktop: /Users/emilyjames/Documents/Pookie/gameboy-emulator-rs/core/src/lib.rs /Users/emilyjames/Documents/Pookie/gameboy-emulator-rs/desktop/src/main.rs
