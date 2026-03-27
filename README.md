@@ -3,7 +3,7 @@
 
 A modular, cycle-accurate Game Boy emulator written in Rust with desktop and web support.
 
-![Rust](https://img.shields.io/badge/rust-1.70+-orange?logo=rust) ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/ci.yml) ![License](https://img.shields.io/github/license/RyanRasi/gameboy-emulator-rs) ![Status](https://img.shields.io/badge/status-in%20development-yellow)![Platform](https://img.shields.io/badge/platform-cross--platform-blue)
+![Rust](https://img.shields.io/badge/rust-1.70+-orange?logo=rust) ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/rust.yml) ![License](https://img.shields.io/github/license/RyanRasi/gameboy-emulator-rs) ![Status](https://img.shields.io/badge/status-in%20development-yellow) ![Platform](https://img.shields.io/badge/platform-cross--platform-blue)
 
  
 🎮 Preview
