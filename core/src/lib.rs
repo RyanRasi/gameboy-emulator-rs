@@ -2,6 +2,7 @@
 //!
 //! Pure logic only — zero I/O dependencies.
 
+pub mod cpu;
 pub mod mmu;
 
 pub fn version() -> &'static str {
