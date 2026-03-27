@@ -1,136 +1,396 @@
-//! Instruction decode and execution.
+//! Instruction decode and execution — Phase 3 expansion.
 //!
-//! Each instruction handler takes a mutable reference to the CPU state
-//! and returns the number of T-cycles consumed.
-//!
-//! T-cycles vs M-cycles:
-//!   The Game Boy clock runs at 4,194,304 Hz.
-//!   One M-cycle = 4 T-cycles.
-//!   We track T-cycles internally; callers may divide by 4 for M-cycles.
+//! Adds: full arithmetic (ADD/ADC/SUB/SBC/AND/OR/XOR/CP/INC/DEC),
+//!       unconditional and conditional jumps (JP/JR),
+//!       stack operations (PUSH/POP),
+//!       subroutine calls (CALL/RET).
 
 use super::Cpu;
+use super::super::mmu::Mmu;
+use super::alu;
+use super::registers::flags;
 
 impl Cpu {
-    /// Fetch the byte at PC and advance PC by 1.
+    /// Fetch byte at PC, advance PC.
     pub(super) fn fetch_byte(&mut self) -> u8 {
-        let byte = self.mmu.read_byte(self.regs.pc);
+        let b = self.mmu.read_byte(self.regs.pc);
         self.regs.pc = self.regs.pc.wrapping_add(1);
-        byte
+        b
     }
 
-    /// Fetch a 16-bit little-endian immediate and advance PC by 2.
+    /// Fetch 16-bit little-endian immediate, advance PC by 2.
     pub(super) fn fetch_word(&mut self) -> u16 {
         let lo = self.fetch_byte() as u16;
         let hi = self.fetch_byte() as u16;
         (hi << 8) | lo
     }
 
-    /// Decode and execute the next instruction.
-    /// Returns the number of T-cycles consumed.
+    // ── Stack helpers ────────────────────────────────────────────────────────
+
+    /// Push a 16-bit value onto the stack (SP decrements by 2).
+    pub(super) fn stack_push(&mut self, value: u16) {
+        self.regs.sp = self.regs.sp.wrapping_sub(2);
+        self.mmu.write_word(self.regs.sp, value);
+    }
+
+    /// Pop a 16-bit value from the stack (SP increments by 2).
+    pub(super) fn stack_pop(&mut self) -> u16 {
+        let value = self.mmu.read_word(self.regs.sp);
+        self.regs.sp = self.regs.sp.wrapping_add(2);
+        value
+    }
+
+    // ── ALU wiring helpers ───────────────────────────────────────────────────
+
+    fn alu_add(&mut self, x: u8) {
+        let r = alu::add(self.regs.a, x);
+        self.regs.a = r.value;
+        self.regs.f = r.flags;
+    }
+
+    fn alu_adc(&mut self, x: u8) {
+        let r = alu::adc(self.regs.a, x, self.regs.flag_c());
+        self.regs.a = r.value;
+        self.regs.f = r.flags;
+    }
+
+    fn alu_sub(&mut self, x: u8) {
+        let r = alu::sub(self.regs.a, x);
+        self.regs.a = r.value;
+        self.regs.f = r.flags;
+    }
+
+    fn alu_sbc(&mut self, x: u8) {
+        let r = alu::sbc(self.regs.a, x, self.regs.flag_c());
+        self.regs.a = r.value;
+        self.regs.f = r.flags;
+    }
+
+    fn alu_and(&mut self, x: u8) {
+        let r = alu::and(self.regs.a, x);
+        self.regs.a = r.value;
+        self.regs.f = r.flags;
+    }
+
+    fn alu_or(&mut self, x: u8) {
+        let r = alu::or(self.regs.a, x);
+        self.regs.a = r.value;
+        self.regs.f = r.flags;
+    }
+
+    fn alu_xor(&mut self, x: u8) {
+        let r = alu::xor(self.regs.a, x);
+        self.regs.a = r.value;
+        self.regs.f = r.flags;
+    }
+
+    fn alu_cp(&mut self, x: u8) {
+        // CP only updates flags — A is unchanged
+        let r = alu::cp(self.regs.a, x);
+        self.regs.f = r.flags;
+    }
+
+    // ── Decode / execute ─────────────────────────────────────────────────────
+
+    /// Decode and execute one instruction. Returns T-cycles consumed.
     pub fn step(&mut self) -> u32 {
         let opcode = self.fetch_byte();
 
         match opcode {
-            // ------------------------------------------------------------------
-            // 0x00 — NOP  (4 T-cycles)
-            // ------------------------------------------------------------------
+
+            // ── NOP ─────────────────────────────────────────────────────────
             0x00 => 4,
 
-            // ------------------------------------------------------------------
-            // 8-bit immediate loads  LD r, n8  (8 T-cycles each)
-            // ------------------------------------------------------------------
-            0x06 => { let n = self.fetch_byte(); self.regs.b = n; 8 }  // LD B, n
-            0x0E => { let n = self.fetch_byte(); self.regs.c = n; 8 }  // LD C, n
-            0x16 => { let n = self.fetch_byte(); self.regs.d = n; 8 }  // LD D, n
-            0x1E => { let n = self.fetch_byte(); self.regs.e = n; 8 }  // LD E, n
-            0x26 => { let n = self.fetch_byte(); self.regs.h = n; 8 }  // LD H, n
-            0x2E => { let n = self.fetch_byte(); self.regs.l = n; 8 }  // LD L, n
-            0x3E => { let n = self.fetch_byte(); self.regs.a = n; 8 }  // LD A, n
+            // ── 8-bit immediate loads LD r, n8 ──────────────────────────────
+            0x06 => { let n = self.fetch_byte(); self.regs.b = n; 8 }
+            0x0E => { let n = self.fetch_byte(); self.regs.c = n; 8 }
+            0x16 => { let n = self.fetch_byte(); self.regs.d = n; 8 }
+            0x1E => { let n = self.fetch_byte(); self.regs.e = n; 8 }
+            0x26 => { let n = self.fetch_byte(); self.regs.h = n; 8 }
+            0x2E => { let n = self.fetch_byte(); self.regs.l = n; 8 }
+            0x3E => { let n = self.fetch_byte(); self.regs.a = n; 8 }
 
-            // ------------------------------------------------------------------
-            // 16-bit immediate loads  LD rr, n16  (12 T-cycles each)
-            // ------------------------------------------------------------------
-            0x01 => { let nn = self.fetch_word(); self.regs.set_bc(nn); 12 } // LD BC, nn
-            0x11 => { let nn = self.fetch_word(); self.regs.set_de(nn); 12 } // LD DE, nn
-            0x21 => { let nn = self.fetch_word(); self.regs.set_hl(nn); 12 } // LD HL, nn
-            0x31 => { let nn = self.fetch_word(); self.regs.sp = nn;    12 } // LD SP, nn
+            // ── 16-bit immediate loads LD rr, n16 ───────────────────────────
+            0x01 => { let nn = self.fetch_word(); self.regs.set_bc(nn); 12 }
+            0x11 => { let nn = self.fetch_word(); self.regs.set_de(nn); 12 }
+            0x21 => { let nn = self.fetch_word(); self.regs.set_hl(nn); 12 }
+            0x31 => { let nn = self.fetch_word(); self.regs.sp = nn;    12 }
 
-            // ------------------------------------------------------------------
-            // 8-bit register-to-register loads  LD r, r'  (4 T-cycles each)
-            // Row B (0x40–0x47)
-            // ------------------------------------------------------------------
-            0x40 => 4, // LD B, B (no-op in effect)
-            0x41 => { self.regs.b = self.regs.c; 4 } // LD B, C
-            0x42 => { self.regs.b = self.regs.d; 4 } // LD B, D
-            0x43 => { self.regs.b = self.regs.e; 4 } // LD B, E
-            0x44 => { self.regs.b = self.regs.h; 4 } // LD B, H
-            0x45 => { self.regs.b = self.regs.l; 4 } // LD B, L
-            0x47 => { self.regs.b = self.regs.a; 4 } // LD B, A
+            // ── INC r8 ───────────────────────────────────────────────────────
+            0x04 => { let r = alu::inc(self.regs.b, self.regs.f); self.regs.b = r.value; self.regs.f = r.flags; 4 }
+            0x0C => { let r = alu::inc(self.regs.c, self.regs.f); self.regs.c = r.value; self.regs.f = r.flags; 4 }
+            0x14 => { let r = alu::inc(self.regs.d, self.regs.f); self.regs.d = r.value; self.regs.f = r.flags; 4 }
+            0x1C => { let r = alu::inc(self.regs.e, self.regs.f); self.regs.e = r.value; self.regs.f = r.flags; 4 }
+            0x24 => { let r = alu::inc(self.regs.h, self.regs.f); self.regs.h = r.value; self.regs.f = r.flags; 4 }
+            0x2C => { let r = alu::inc(self.regs.l, self.regs.f); self.regs.l = r.value; self.regs.f = r.flags; 4 }
+            0x3C => { let r = alu::inc(self.regs.a, self.regs.f); self.regs.a = r.value; self.regs.f = r.flags; 4 }
 
-            // Row C (0x48–0x4F)
-            0x48 => { self.regs.c = self.regs.b; 4 } // LD C, B
-            0x49 => 4,                                 // LD C, C
-            0x4A => { self.regs.c = self.regs.d; 4 } // LD C, D
-            0x4B => { self.regs.c = self.regs.e; 4 } // LD C, E
-            0x4C => { self.regs.c = self.regs.h; 4 } // LD C, H
-            0x4D => { self.regs.c = self.regs.l; 4 } // LD C, L
-            0x4F => { self.regs.c = self.regs.a; 4 } // LD C, A
+            // ── DEC r8 ───────────────────────────────────────────────────────
+            0x05 => { let r = alu::dec(self.regs.b, self.regs.f); self.regs.b = r.value; self.regs.f = r.flags; 4 }
+            0x0D => { let r = alu::dec(self.regs.c, self.regs.f); self.regs.c = r.value; self.regs.f = r.flags; 4 }
+            0x15 => { let r = alu::dec(self.regs.d, self.regs.f); self.regs.d = r.value; self.regs.f = r.flags; 4 }
+            0x1D => { let r = alu::dec(self.regs.e, self.regs.f); self.regs.e = r.value; self.regs.f = r.flags; 4 }
+            0x25 => { let r = alu::dec(self.regs.h, self.regs.f); self.regs.h = r.value; self.regs.f = r.flags; 4 }
+            0x2D => { let r = alu::dec(self.regs.l, self.regs.f); self.regs.l = r.value; self.regs.f = r.flags; 4 }
+            0x3D => { let r = alu::dec(self.regs.a, self.regs.f); self.regs.a = r.value; self.regs.f = r.flags; 4 }
 
-            // Row D (0x50–0x57)
-            0x50 => { self.regs.d = self.regs.b; 4 } // LD D, B
-            0x51 => { self.regs.d = self.regs.c; 4 } // LD D, C
-            0x52 => 4,                                 // LD D, D
-            0x53 => { self.regs.d = self.regs.e; 4 } // LD D, E
-            0x54 => { self.regs.d = self.regs.h; 4 } // LD D, H
-            0x55 => { self.regs.d = self.regs.l; 4 } // LD D, L
-            0x57 => { self.regs.d = self.regs.a; 4 } // LD D, A
+            // ── Register-to-register LD r, r' ───────────────────────────────
+            0x40 => 4,
+            0x41 => { self.regs.b = self.regs.c; 4 }
+            0x42 => { self.regs.b = self.regs.d; 4 }
+            0x43 => { self.regs.b = self.regs.e; 4 }
+            0x44 => { self.regs.b = self.regs.h; 4 }
+            0x45 => { self.regs.b = self.regs.l; 4 }
+            0x47 => { self.regs.b = self.regs.a; 4 }
 
-            // Row E (0x58–0x5F)
-            0x58 => { self.regs.e = self.regs.b; 4 } // LD E, B
-            0x59 => { self.regs.e = self.regs.c; 4 } // LD E, C
-            0x5A => { self.regs.e = self.regs.d; 4 } // LD E, D
-            0x5B => 4,                                 // LD E, E
-            0x5C => { self.regs.e = self.regs.h; 4 } // LD E, H
-            0x5D => { self.regs.e = self.regs.l; 4 } // LD E, L
-            0x5F => { self.regs.e = self.regs.a; 4 } // LD E, A
+            0x48 => { self.regs.c = self.regs.b; 4 }
+            0x49 => 4,
+            0x4A => { self.regs.c = self.regs.d; 4 }
+            0x4B => { self.regs.c = self.regs.e; 4 }
+            0x4C => { self.regs.c = self.regs.h; 4 }
+            0x4D => { self.regs.c = self.regs.l; 4 }
+            0x4F => { self.regs.c = self.regs.a; 4 }
 
-            // Row H (0x60–0x67)
-            0x60 => { self.regs.h = self.regs.b; 4 } // LD H, B
-            0x61 => { self.regs.h = self.regs.c; 4 } // LD H, C
-            0x62 => { self.regs.h = self.regs.d; 4 } // LD H, D
-            0x63 => { self.regs.h = self.regs.e; 4 } // LD H, E
-            0x64 => 4,                                 // LD H, H
-            0x65 => { self.regs.h = self.regs.l; 4 } // LD H, L
-            0x67 => { self.regs.h = self.regs.a; 4 } // LD H, A
+            0x50 => { self.regs.d = self.regs.b; 4 }
+            0x51 => { self.regs.d = self.regs.c; 4 }
+            0x52 => 4,
+            0x53 => { self.regs.d = self.regs.e; 4 }
+            0x54 => { self.regs.d = self.regs.h; 4 }
+            0x55 => { self.regs.d = self.regs.l; 4 }
+            0x57 => { self.regs.d = self.regs.a; 4 }
 
-            // Row L (0x68–0x6F)
-            0x68 => { self.regs.l = self.regs.b; 4 } // LD L, B
-            0x69 => { self.regs.l = self.regs.c; 4 } // LD L, C
-            0x6A => { self.regs.l = self.regs.d; 4 } // LD L, D
-            0x6B => { self.regs.l = self.regs.e; 4 } // LD L, E
-            0x6C => { self.regs.l = self.regs.h; 4 } // LD L, H
-            0x6D => 4,                                 // LD L, L
-            0x6F => { self.regs.l = self.regs.a; 4 } // LD L, A
+            0x58 => { self.regs.e = self.regs.b; 4 }
+            0x59 => { self.regs.e = self.regs.c; 4 }
+            0x5A => { self.regs.e = self.regs.d; 4 }
+            0x5B => 4,
+            0x5C => { self.regs.e = self.regs.h; 4 }
+            0x5D => { self.regs.e = self.regs.l; 4 }
+            0x5F => { self.regs.e = self.regs.a; 4 }
 
-            // Row A (0x78–0x7F)
-            0x78 => { self.regs.a = self.regs.b; 4 } // LD A, B
-            0x79 => { self.regs.a = self.regs.c; 4 } // LD A, C
-            0x7A => { self.regs.a = self.regs.d; 4 } // LD A, D
-            0x7B => { self.regs.a = self.regs.e; 4 } // LD A, E
-            0x7C => { self.regs.a = self.regs.h; 4 } // LD A, H
-            0x7D => { self.regs.a = self.regs.l; 4 } // LD A, L
-            0x7F => 4,                                 // LD A, A
+            0x60 => { self.regs.h = self.regs.b; 4 }
+            0x61 => { self.regs.h = self.regs.c; 4 }
+            0x62 => { self.regs.h = self.regs.d; 4 }
+            0x63 => { self.regs.h = self.regs.e; 4 }
+            0x64 => 4,
+            0x65 => { self.regs.h = self.regs.l; 4 }
+            0x67 => { self.regs.h = self.regs.a; 4 }
 
-            // ------------------------------------------------------------------
-            // Unimplemented — will be filled in during Phase 3+
-            // ------------------------------------------------------------------
+            0x68 => { self.regs.l = self.regs.b; 4 }
+            0x69 => { self.regs.l = self.regs.c; 4 }
+            0x6A => { self.regs.l = self.regs.d; 4 }
+            0x6B => { self.regs.l = self.regs.e; 4 }
+            0x6C => { self.regs.l = self.regs.h; 4 }
+            0x6D => 4,
+            0x6F => { self.regs.l = self.regs.a; 4 }
+
+            0x78 => { self.regs.a = self.regs.b; 4 }
+            0x79 => { self.regs.a = self.regs.c; 4 }
+            0x7A => { self.regs.a = self.regs.d; 4 }
+            0x7B => { self.regs.a = self.regs.e; 4 }
+            0x7C => { self.regs.a = self.regs.h; 4 }
+            0x7D => { self.regs.a = self.regs.l; 4 }
+            0x7F => 4,
+
+            // ── ADD A, r ────────────────────────────────────────────────────
+            0x80 => { self.alu_add(self.regs.b); 4 }
+            0x81 => { self.alu_add(self.regs.c); 4 }
+            0x82 => { self.alu_add(self.regs.d); 4 }
+            0x83 => { self.alu_add(self.regs.e); 4 }
+            0x84 => { self.alu_add(self.regs.h); 4 }
+            0x85 => { self.alu_add(self.regs.l); 4 }
+            0x87 => { self.alu_add(self.regs.a); 4 }
+            0xC6 => { let n = self.fetch_byte(); self.alu_add(n); 8 } // ADD A, n8
+
+            // ── ADC A, r ────────────────────────────────────────────────────
+            0x88 => { self.alu_adc(self.regs.b); 4 }
+            0x89 => { self.alu_adc(self.regs.c); 4 }
+            0x8A => { self.alu_adc(self.regs.d); 4 }
+            0x8B => { self.alu_adc(self.regs.e); 4 }
+            0x8C => { self.alu_adc(self.regs.h); 4 }
+            0x8D => { self.alu_adc(self.regs.l); 4 }
+            0x8F => { self.alu_adc(self.regs.a); 4 }
+            0xCE => { let n = self.fetch_byte(); self.alu_adc(n); 8 } // ADC A, n8
+
+            // ── SUB A, r ────────────────────────────────────────────────────
+            0x90 => { self.alu_sub(self.regs.b); 4 }
+            0x91 => { self.alu_sub(self.regs.c); 4 }
+            0x92 => { self.alu_sub(self.regs.d); 4 }
+            0x93 => { self.alu_sub(self.regs.e); 4 }
+            0x94 => { self.alu_sub(self.regs.h); 4 }
+            0x95 => { self.alu_sub(self.regs.l); 4 }
+            0x97 => { self.alu_sub(self.regs.a); 4 }
+            0xD6 => { let n = self.fetch_byte(); self.alu_sub(n); 8 } // SUB A, n8
+
+            // ── SBC A, r ────────────────────────────────────────────────────
+            0x98 => { self.alu_sbc(self.regs.b); 4 }
+            0x99 => { self.alu_sbc(self.regs.c); 4 }
+            0x9A => { self.alu_sbc(self.regs.d); 4 }
+            0x9B => { self.alu_sbc(self.regs.e); 4 }
+            0x9C => { self.alu_sbc(self.regs.h); 4 }
+            0x9D => { self.alu_sbc(self.regs.l); 4 }
+            0x9F => { self.alu_sbc(self.regs.a); 4 }
+            0xDE => { let n = self.fetch_byte(); self.alu_sbc(n); 8 } // SBC A, n8
+
+            // ── AND A, r ────────────────────────────────────────────────────
+            0xA0 => { self.alu_and(self.regs.b); 4 }
+            0xA1 => { self.alu_and(self.regs.c); 4 }
+            0xA2 => { self.alu_and(self.regs.d); 4 }
+            0xA3 => { self.alu_and(self.regs.e); 4 }
+            0xA4 => { self.alu_and(self.regs.h); 4 }
+            0xA5 => { self.alu_and(self.regs.l); 4 }
+            0xA7 => { self.alu_and(self.regs.a); 4 }
+            0xE6 => { let n = self.fetch_byte(); self.alu_and(n); 8 } // AND A, n8
+
+            // ── XOR A, r ────────────────────────────────────────────────────
+            0xA8 => { self.alu_xor(self.regs.b); 4 }
+            0xA9 => { self.alu_xor(self.regs.c); 4 }
+            0xAA => { self.alu_xor(self.regs.d); 4 }
+            0xAB => { self.alu_xor(self.regs.e); 4 }
+            0xAC => { self.alu_xor(self.regs.h); 4 }
+            0xAD => { self.alu_xor(self.regs.l); 4 }
+            0xAF => { self.alu_xor(self.regs.a); 4 }
+            0xEE => { let n = self.fetch_byte(); self.alu_xor(n); 8 } // XOR A, n8
+
+            // ── OR A, r ─────────────────────────────────────────────────────
+            0xB0 => { self.alu_or(self.regs.b); 4 }
+            0xB1 => { self.alu_or(self.regs.c); 4 }
+            0xB2 => { self.alu_or(self.regs.d); 4 }
+            0xB3 => { self.alu_or(self.regs.e); 4 }
+            0xB4 => { self.alu_or(self.regs.h); 4 }
+            0xB5 => { self.alu_or(self.regs.l); 4 }
+            0xB7 => { self.alu_or(self.regs.a); 4 }
+            0xF6 => { let n = self.fetch_byte(); self.alu_or(n); 8 }  // OR A, n8
+
+            // ── CP A, r ─────────────────────────────────────────────────────
+            0xB8 => { self.alu_cp(self.regs.b); 4 }
+            0xB9 => { self.alu_cp(self.regs.c); 4 }
+            0xBA => { self.alu_cp(self.regs.d); 4 }
+            0xBB => { self.alu_cp(self.regs.e); 4 }
+            0xBC => { self.alu_cp(self.regs.h); 4 }
+            0xBD => { self.alu_cp(self.regs.l); 4 }
+            0xBF => { self.alu_cp(self.regs.a); 4 }
+            0xFE => { let n = self.fetch_byte(); self.alu_cp(n); 8 }  // CP A, n8
+
+            // ── PUSH / POP ───────────────────────────────────────────────────
+            0xC1 => { let v = self.stack_pop(); self.regs.set_bc(v); 12 }  // POP BC
+            0xD1 => { let v = self.stack_pop(); self.regs.set_de(v); 12 }  // POP DE
+            0xE1 => { let v = self.stack_pop(); self.regs.set_hl(v); 12 }  // POP HL
+            0xF1 => { let v = self.stack_pop(); self.regs.set_af(v); 12 }  // POP AF
+
+            0xC5 => { let v = self.regs.bc(); self.stack_push(v); 16 }     // PUSH BC
+            0xD5 => { let v = self.regs.de(); self.stack_push(v); 16 }     // PUSH DE
+            0xE5 => { let v = self.regs.hl(); self.stack_push(v); 16 }     // PUSH HL
+            0xF5 => { let v = self.regs.af(); self.stack_push(v); 16 }     // PUSH AF
+
+            // ── JP nn (unconditional) ────────────────────────────────────────
+            0xC3 => {
+                let nn = self.fetch_word();
+                self.regs.pc = nn;
+                16
+            }
+
+            // ── JP cc, nn (conditional) ──────────────────────────────────────
+            0xC2 => { // JP NZ, nn
+                let nn = self.fetch_word();
+                if !self.regs.flag_z() { self.regs.pc = nn; 16 } else { 12 }
+            }
+            0xCA => { // JP Z, nn
+                let nn = self.fetch_word();
+                if self.regs.flag_z() { self.regs.pc = nn; 16 } else { 12 }
+            }
+            0xD2 => { // JP NC, nn
+                let nn = self.fetch_word();
+                if !self.regs.flag_c() { self.regs.pc = nn; 16 } else { 12 }
+            }
+            0xDA => { // JP C, nn
+                let nn = self.fetch_word();
+                if self.regs.flag_c() { self.regs.pc = nn; 16 } else { 12 }
+            }
+
+            // ── JR e (unconditional relative jump) ───────────────────────────
+            0x18 => {
+                let e = self.fetch_byte() as i8;
+                self.regs.pc = self.regs.pc.wrapping_add(e as u16);
+                12
+            }
+
+            // ── JR cc, e (conditional relative jump) ─────────────────────────
+            0x20 => { // JR NZ, e
+                let e = self.fetch_byte() as i8;
+                if !self.regs.flag_z() { self.regs.pc = self.regs.pc.wrapping_add(e as u16); 12 } else { 8 }
+            }
+            0x28 => { // JR Z, e
+                let e = self.fetch_byte() as i8;
+                if self.regs.flag_z() { self.regs.pc = self.regs.pc.wrapping_add(e as u16); 12 } else { 8 }
+            }
+            0x30 => { // JR NC, e
+                let e = self.fetch_byte() as i8;
+                if !self.regs.flag_c() { self.regs.pc = self.regs.pc.wrapping_add(e as u16); 12 } else { 8 }
+            }
+            0x38 => { // JR C, e
+                let e = self.fetch_byte() as i8;
+                if self.regs.flag_c() { self.regs.pc = self.regs.pc.wrapping_add(e as u16); 12 } else { 8 }
+            }
+
+            // ── CALL nn ──────────────────────────────────────────────────────
+            0xCD => {
+                let nn = self.fetch_word();
+                let ret = self.regs.pc;     // return address (already past operand)
+                self.stack_push(ret);
+                self.regs.pc = nn;
+                24
+            }
+
+            // ── CALL cc, nn ──────────────────────────────────────────────────
+            0xC4 => { // CALL NZ, nn
+                let nn = self.fetch_word();
+                if !self.regs.flag_z() { let r = self.regs.pc; self.stack_push(r); self.regs.pc = nn; 24 } else { 12 }
+            }
+            0xCC => { // CALL Z, nn
+                let nn = self.fetch_word();
+                if self.regs.flag_z() { let r = self.regs.pc; self.stack_push(r); self.regs.pc = nn; 24 } else { 12 }
+            }
+            0xD4 => { // CALL NC, nn
+                let nn = self.fetch_word();
+                if !self.regs.flag_c() { let r = self.regs.pc; self.stack_push(r); self.regs.pc = nn; 24 } else { 12 }
+            }
+            0xDC => { // CALL C, nn
+                let nn = self.fetch_word();
+                if self.regs.flag_c() { let r = self.regs.pc; self.stack_push(r); self.regs.pc = nn; 24 } else { 12 }
+            }
+
+            // ── RET ──────────────────────────────────────────────────────────
+            0xC9 => {
+                let addr = self.stack_pop();
+                self.regs.pc = addr;
+                16
+            }
+
+            // ── RET cc ───────────────────────────────────────────────────────
+            0xC0 => { // RET NZ
+                if !self.regs.flag_z() { let a = self.stack_pop(); self.regs.pc = a; 20 } else { 8 }
+            }
+            0xC8 => { // RET Z
+                if self.regs.flag_z() { let a = self.stack_pop(); self.regs.pc = a; 20 } else { 8 }
+            }
+            0xD0 => { // RET NC
+                if !self.regs.flag_c() { let a = self.stack_pop(); self.regs.pc = a; 20 } else { 8 }
+            }
+            0xD8 => { // RET C
+                if self.regs.flag_c() { let a = self.stack_pop(); self.regs.pc = a; 20 } else { 8 }
+            }
+
+            // ── Interrupt control ────────────────────────────────────────────
+            0xF3 => { self.ime = false; 4 } // DI
+            0xFB => { self.ime = true;  4 } // EI
+
+            // ── Unimplemented ────────────────────────────────────────────────
             unknown => {
                 log::warn!(
                     "Unimplemented opcode 0x{:02X} at PC=0x{:04X}",
                     unknown,
                     self.regs.pc.wrapping_sub(1)
                 );
-                // Treat as NOP — 4 cycles — keeps emulator alive during development
                 4
             }
         }
