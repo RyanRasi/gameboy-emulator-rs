@@ -4,6 +4,7 @@
 
 pub mod cpu;
 pub mod mmu;
+pub mod timer;
 
 pub fn version() -> &'static str {
     "gb-emulator-core 0.1.0"
