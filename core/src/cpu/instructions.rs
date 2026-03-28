@@ -1,107 +1,77 @@
-//! Instruction decode and execution — Phase 3 expansion.
-//!
-//! Adds: full arithmetic (ADD/ADC/SUB/SBC/AND/OR/XOR/CP/INC/DEC),
-//!       unconditional and conditional jumps (JP/JR),
-//!       stack operations (PUSH/POP),
-//!       subroutine calls (CALL/RET).
+//! Instruction decode and execution — Phase 3 + HALT (Phase 4).
 
 use super::Cpu;
-use super::super::mmu::Mmu;
 use super::alu;
 use super::registers::flags;
 
 impl Cpu {
-    /// Fetch byte at PC, advance PC.
     pub(super) fn fetch_byte(&mut self) -> u8 {
         let b = self.mmu.read_byte(self.regs.pc);
         self.regs.pc = self.regs.pc.wrapping_add(1);
         b
     }
 
-    /// Fetch 16-bit little-endian immediate, advance PC by 2.
     pub(super) fn fetch_word(&mut self) -> u16 {
         let lo = self.fetch_byte() as u16;
         let hi = self.fetch_byte() as u16;
         (hi << 8) | lo
     }
 
-    // ── Stack helpers ────────────────────────────────────────────────────────
-
-    /// Push a 16-bit value onto the stack (SP decrements by 2).
     pub(super) fn stack_push(&mut self, value: u16) {
         self.regs.sp = self.regs.sp.wrapping_sub(2);
         self.mmu.write_word(self.regs.sp, value);
     }
 
-    /// Pop a 16-bit value from the stack (SP increments by 2).
     pub(super) fn stack_pop(&mut self) -> u16 {
         let value = self.mmu.read_word(self.regs.sp);
         self.regs.sp = self.regs.sp.wrapping_add(2);
         value
     }
 
-    // ── ALU wiring helpers ───────────────────────────────────────────────────
-
     fn alu_add(&mut self, x: u8) {
         let r = alu::add(self.regs.a, x);
-        self.regs.a = r.value;
-        self.regs.f = r.flags;
+        self.regs.a = r.value; self.regs.f = r.flags;
     }
-
     fn alu_adc(&mut self, x: u8) {
         let r = alu::adc(self.regs.a, x, self.regs.flag_c());
-        self.regs.a = r.value;
-        self.regs.f = r.flags;
+        self.regs.a = r.value; self.regs.f = r.flags;
     }
-
     fn alu_sub(&mut self, x: u8) {
         let r = alu::sub(self.regs.a, x);
-        self.regs.a = r.value;
-        self.regs.f = r.flags;
+        self.regs.a = r.value; self.regs.f = r.flags;
     }
-
     fn alu_sbc(&mut self, x: u8) {
         let r = alu::sbc(self.regs.a, x, self.regs.flag_c());
-        self.regs.a = r.value;
-        self.regs.f = r.flags;
+        self.regs.a = r.value; self.regs.f = r.flags;
     }
-
     fn alu_and(&mut self, x: u8) {
         let r = alu::and(self.regs.a, x);
-        self.regs.a = r.value;
-        self.regs.f = r.flags;
+        self.regs.a = r.value; self.regs.f = r.flags;
     }
-
     fn alu_or(&mut self, x: u8) {
         let r = alu::or(self.regs.a, x);
-        self.regs.a = r.value;
-        self.regs.f = r.flags;
+        self.regs.a = r.value; self.regs.f = r.flags;
     }
-
     fn alu_xor(&mut self, x: u8) {
         let r = alu::xor(self.regs.a, x);
-        self.regs.a = r.value;
-        self.regs.f = r.flags;
+        self.regs.a = r.value; self.regs.f = r.flags;
     }
-
     fn alu_cp(&mut self, x: u8) {
-        // CP only updates flags — A is unchanged
         let r = alu::cp(self.regs.a, x);
         self.regs.f = r.flags;
     }
 
-    // ── Decode / execute ─────────────────────────────────────────────────────
-
-    /// Decode and execute one instruction. Returns T-cycles consumed.
     pub fn step(&mut self) -> u32 {
         let opcode = self.fetch_byte();
-
         match opcode {
 
             // ── NOP ─────────────────────────────────────────────────────────
             0x00 => 4,
 
-            // ── 8-bit immediate loads LD r, n8 ──────────────────────────────
+            // ── HALT ────────────────────────────────────────────────────────
+            0x76 => { self.halted = true; 4 }
+
+            // ── 8-bit immediate loads ────────────────────────────────────────
             0x06 => { let n = self.fetch_byte(); self.regs.b = n; 8 }
             0x0E => { let n = self.fetch_byte(); self.regs.c = n; 8 }
             0x16 => { let n = self.fetch_byte(); self.regs.d = n; 8 }
@@ -110,7 +80,7 @@ impl Cpu {
             0x2E => { let n = self.fetch_byte(); self.regs.l = n; 8 }
             0x3E => { let n = self.fetch_byte(); self.regs.a = n; 8 }
 
-            // ── 16-bit immediate loads LD rr, n16 ───────────────────────────
+            // ── 16-bit immediate loads ────────────────────────────────────────
             0x01 => { let nn = self.fetch_word(); self.regs.set_bc(nn); 12 }
             0x11 => { let nn = self.fetch_word(); self.regs.set_de(nn); 12 }
             0x21 => { let nn = self.fetch_word(); self.regs.set_hl(nn); 12 }
@@ -134,7 +104,7 @@ impl Cpu {
             0x2D => { let r = alu::dec(self.regs.l, self.regs.f); self.regs.l = r.value; self.regs.f = r.flags; 4 }
             0x3D => { let r = alu::dec(self.regs.a, self.regs.f); self.regs.a = r.value; self.regs.f = r.flags; 4 }
 
-            // ── Register-to-register LD r, r' ───────────────────────────────
+            // ── Register-to-register LD r, r' ────────────────────────────────
             0x40 => 4,
             0x41 => { self.regs.b = self.regs.c; 4 }
             0x42 => { self.regs.b = self.regs.d; 4 }
@@ -191,7 +161,7 @@ impl Cpu {
             0x7D => { self.regs.a = self.regs.l; 4 }
             0x7F => 4,
 
-            // ── ADD A, r ────────────────────────────────────────────────────
+            // ── ADD A, r ─────────────────────────────────────────────────────
             0x80 => { self.alu_add(self.regs.b); 4 }
             0x81 => { self.alu_add(self.regs.c); 4 }
             0x82 => { self.alu_add(self.regs.d); 4 }
@@ -199,9 +169,9 @@ impl Cpu {
             0x84 => { self.alu_add(self.regs.h); 4 }
             0x85 => { self.alu_add(self.regs.l); 4 }
             0x87 => { self.alu_add(self.regs.a); 4 }
-            0xC6 => { let n = self.fetch_byte(); self.alu_add(n); 8 } // ADD A, n8
+            0xC6 => { let n = self.fetch_byte(); self.alu_add(n); 8 }
 
-            // ── ADC A, r ────────────────────────────────────────────────────
+            // ── ADC A, r ─────────────────────────────────────────────────────
             0x88 => { self.alu_adc(self.regs.b); 4 }
             0x89 => { self.alu_adc(self.regs.c); 4 }
             0x8A => { self.alu_adc(self.regs.d); 4 }
@@ -209,9 +179,9 @@ impl Cpu {
             0x8C => { self.alu_adc(self.regs.h); 4 }
             0x8D => { self.alu_adc(self.regs.l); 4 }
             0x8F => { self.alu_adc(self.regs.a); 4 }
-            0xCE => { let n = self.fetch_byte(); self.alu_adc(n); 8 } // ADC A, n8
+            0xCE => { let n = self.fetch_byte(); self.alu_adc(n); 8 }
 
-            // ── SUB A, r ────────────────────────────────────────────────────
+            // ── SUB A, r ─────────────────────────────────────────────────────
             0x90 => { self.alu_sub(self.regs.b); 4 }
             0x91 => { self.alu_sub(self.regs.c); 4 }
             0x92 => { self.alu_sub(self.regs.d); 4 }
@@ -219,9 +189,9 @@ impl Cpu {
             0x94 => { self.alu_sub(self.regs.h); 4 }
             0x95 => { self.alu_sub(self.regs.l); 4 }
             0x97 => { self.alu_sub(self.regs.a); 4 }
-            0xD6 => { let n = self.fetch_byte(); self.alu_sub(n); 8 } // SUB A, n8
+            0xD6 => { let n = self.fetch_byte(); self.alu_sub(n); 8 }
 
-            // ── SBC A, r ────────────────────────────────────────────────────
+            // ── SBC A, r ─────────────────────────────────────────────────────
             0x98 => { self.alu_sbc(self.regs.b); 4 }
             0x99 => { self.alu_sbc(self.regs.c); 4 }
             0x9A => { self.alu_sbc(self.regs.d); 4 }
@@ -229,9 +199,9 @@ impl Cpu {
             0x9C => { self.alu_sbc(self.regs.h); 4 }
             0x9D => { self.alu_sbc(self.regs.l); 4 }
             0x9F => { self.alu_sbc(self.regs.a); 4 }
-            0xDE => { let n = self.fetch_byte(); self.alu_sbc(n); 8 } // SBC A, n8
+            0xDE => { let n = self.fetch_byte(); self.alu_sbc(n); 8 }
 
-            // ── AND A, r ────────────────────────────────────────────────────
+            // ── AND A, r ─────────────────────────────────────────────────────
             0xA0 => { self.alu_and(self.regs.b); 4 }
             0xA1 => { self.alu_and(self.regs.c); 4 }
             0xA2 => { self.alu_and(self.regs.d); 4 }
@@ -239,9 +209,9 @@ impl Cpu {
             0xA4 => { self.alu_and(self.regs.h); 4 }
             0xA5 => { self.alu_and(self.regs.l); 4 }
             0xA7 => { self.alu_and(self.regs.a); 4 }
-            0xE6 => { let n = self.fetch_byte(); self.alu_and(n); 8 } // AND A, n8
+            0xE6 => { let n = self.fetch_byte(); self.alu_and(n); 8 }
 
-            // ── XOR A, r ────────────────────────────────────────────────────
+            // ── XOR A, r ─────────────────────────────────────────────────────
             0xA8 => { self.alu_xor(self.regs.b); 4 }
             0xA9 => { self.alu_xor(self.regs.c); 4 }
             0xAA => { self.alu_xor(self.regs.d); 4 }
@@ -249,9 +219,9 @@ impl Cpu {
             0xAC => { self.alu_xor(self.regs.h); 4 }
             0xAD => { self.alu_xor(self.regs.l); 4 }
             0xAF => { self.alu_xor(self.regs.a); 4 }
-            0xEE => { let n = self.fetch_byte(); self.alu_xor(n); 8 } // XOR A, n8
+            0xEE => { let n = self.fetch_byte(); self.alu_xor(n); 8 }
 
-            // ── OR A, r ─────────────────────────────────────────────────────
+            // ── OR A, r ──────────────────────────────────────────────────────
             0xB0 => { self.alu_or(self.regs.b); 4 }
             0xB1 => { self.alu_or(self.regs.c); 4 }
             0xB2 => { self.alu_or(self.regs.d); 4 }
@@ -259,9 +229,9 @@ impl Cpu {
             0xB4 => { self.alu_or(self.regs.h); 4 }
             0xB5 => { self.alu_or(self.regs.l); 4 }
             0xB7 => { self.alu_or(self.regs.a); 4 }
-            0xF6 => { let n = self.fetch_byte(); self.alu_or(n); 8 }  // OR A, n8
+            0xF6 => { let n = self.fetch_byte(); self.alu_or(n); 8 }
 
-            // ── CP A, r ─────────────────────────────────────────────────────
+            // ── CP A, r ──────────────────────────────────────────────────────
             0xB8 => { self.alu_cp(self.regs.b); 4 }
             0xB9 => { self.alu_cp(self.regs.c); 4 }
             0xBA => { self.alu_cp(self.regs.d); 4 }
@@ -269,122 +239,51 @@ impl Cpu {
             0xBC => { self.alu_cp(self.regs.h); 4 }
             0xBD => { self.alu_cp(self.regs.l); 4 }
             0xBF => { self.alu_cp(self.regs.a); 4 }
-            0xFE => { let n = self.fetch_byte(); self.alu_cp(n); 8 }  // CP A, n8
+            0xFE => { let n = self.fetch_byte(); self.alu_cp(n); 8 }
 
             // ── PUSH / POP ───────────────────────────────────────────────────
-            0xC1 => { let v = self.stack_pop(); self.regs.set_bc(v); 12 }  // POP BC
-            0xD1 => { let v = self.stack_pop(); self.regs.set_de(v); 12 }  // POP DE
-            0xE1 => { let v = self.stack_pop(); self.regs.set_hl(v); 12 }  // POP HL
-            0xF1 => { let v = self.stack_pop(); self.regs.set_af(v); 12 }  // POP AF
+            0xC1 => { let v = self.stack_pop(); self.regs.set_bc(v); 12 }
+            0xD1 => { let v = self.stack_pop(); self.regs.set_de(v); 12 }
+            0xE1 => { let v = self.stack_pop(); self.regs.set_hl(v); 12 }
+            0xF1 => { let v = self.stack_pop(); self.regs.set_af(v); 12 }
+            0xC5 => { let v = self.regs.bc(); self.stack_push(v); 16 }
+            0xD5 => { let v = self.regs.de(); self.stack_push(v); 16 }
+            0xE5 => { let v = self.regs.hl(); self.stack_push(v); 16 }
+            0xF5 => { let v = self.regs.af(); self.stack_push(v); 16 }
 
-            0xC5 => { let v = self.regs.bc(); self.stack_push(v); 16 }     // PUSH BC
-            0xD5 => { let v = self.regs.de(); self.stack_push(v); 16 }     // PUSH DE
-            0xE5 => { let v = self.regs.hl(); self.stack_push(v); 16 }     // PUSH HL
-            0xF5 => { let v = self.regs.af(); self.stack_push(v); 16 }     // PUSH AF
+            // ── JP ───────────────────────────────────────────────────────────
+            0xC3 => { let nn = self.fetch_word(); self.regs.pc = nn; 16 }
+            0xC2 => { let nn = self.fetch_word(); if !self.regs.flag_z() { self.regs.pc = nn; 16 } else { 12 } }
+            0xCA => { let nn = self.fetch_word(); if  self.regs.flag_z() { self.regs.pc = nn; 16 } else { 12 } }
+            0xD2 => { let nn = self.fetch_word(); if !self.regs.flag_c() { self.regs.pc = nn; 16 } else { 12 } }
+            0xDA => { let nn = self.fetch_word(); if  self.regs.flag_c() { self.regs.pc = nn; 16 } else { 12 } }
 
-            // ── JP nn (unconditional) ────────────────────────────────────────
-            0xC3 => {
-                let nn = self.fetch_word();
-                self.regs.pc = nn;
-                16
-            }
+            // ── JR ───────────────────────────────────────────────────────────
+            0x18 => { let e = self.fetch_byte() as i8; self.regs.pc = self.regs.pc.wrapping_add(e as u16); 12 }
+            0x20 => { let e = self.fetch_byte() as i8; if !self.regs.flag_z() { self.regs.pc = self.regs.pc.wrapping_add(e as u16); 12 } else { 8 } }
+            0x28 => { let e = self.fetch_byte() as i8; if  self.regs.flag_z() { self.regs.pc = self.regs.pc.wrapping_add(e as u16); 12 } else { 8 } }
+            0x30 => { let e = self.fetch_byte() as i8; if !self.regs.flag_c() { self.regs.pc = self.regs.pc.wrapping_add(e as u16); 12 } else { 8 } }
+            0x38 => { let e = self.fetch_byte() as i8; if  self.regs.flag_c() { self.regs.pc = self.regs.pc.wrapping_add(e as u16); 12 } else { 8 } }
 
-            // ── JP cc, nn (conditional) ──────────────────────────────────────
-            0xC2 => { // JP NZ, nn
-                let nn = self.fetch_word();
-                if !self.regs.flag_z() { self.regs.pc = nn; 16 } else { 12 }
-            }
-            0xCA => { // JP Z, nn
-                let nn = self.fetch_word();
-                if self.regs.flag_z() { self.regs.pc = nn; 16 } else { 12 }
-            }
-            0xD2 => { // JP NC, nn
-                let nn = self.fetch_word();
-                if !self.regs.flag_c() { self.regs.pc = nn; 16 } else { 12 }
-            }
-            0xDA => { // JP C, nn
-                let nn = self.fetch_word();
-                if self.regs.flag_c() { self.regs.pc = nn; 16 } else { 12 }
-            }
-
-            // ── JR e (unconditional relative jump) ───────────────────────────
-            0x18 => {
-                let e = self.fetch_byte() as i8;
-                self.regs.pc = self.regs.pc.wrapping_add(e as u16);
-                12
-            }
-
-            // ── JR cc, e (conditional relative jump) ─────────────────────────
-            0x20 => { // JR NZ, e
-                let e = self.fetch_byte() as i8;
-                if !self.regs.flag_z() { self.regs.pc = self.regs.pc.wrapping_add(e as u16); 12 } else { 8 }
-            }
-            0x28 => { // JR Z, e
-                let e = self.fetch_byte() as i8;
-                if self.regs.flag_z() { self.regs.pc = self.regs.pc.wrapping_add(e as u16); 12 } else { 8 }
-            }
-            0x30 => { // JR NC, e
-                let e = self.fetch_byte() as i8;
-                if !self.regs.flag_c() { self.regs.pc = self.regs.pc.wrapping_add(e as u16); 12 } else { 8 }
-            }
-            0x38 => { // JR C, e
-                let e = self.fetch_byte() as i8;
-                if self.regs.flag_c() { self.regs.pc = self.regs.pc.wrapping_add(e as u16); 12 } else { 8 }
-            }
-
-            // ── CALL nn ──────────────────────────────────────────────────────
-            0xCD => {
-                let nn = self.fetch_word();
-                let ret = self.regs.pc;     // return address (already past operand)
-                self.stack_push(ret);
-                self.regs.pc = nn;
-                24
-            }
-
-            // ── CALL cc, nn ──────────────────────────────────────────────────
-            0xC4 => { // CALL NZ, nn
-                let nn = self.fetch_word();
-                if !self.regs.flag_z() { let r = self.regs.pc; self.stack_push(r); self.regs.pc = nn; 24 } else { 12 }
-            }
-            0xCC => { // CALL Z, nn
-                let nn = self.fetch_word();
-                if self.regs.flag_z() { let r = self.regs.pc; self.stack_push(r); self.regs.pc = nn; 24 } else { 12 }
-            }
-            0xD4 => { // CALL NC, nn
-                let nn = self.fetch_word();
-                if !self.regs.flag_c() { let r = self.regs.pc; self.stack_push(r); self.regs.pc = nn; 24 } else { 12 }
-            }
-            0xDC => { // CALL C, nn
-                let nn = self.fetch_word();
-                if self.regs.flag_c() { let r = self.regs.pc; self.stack_push(r); self.regs.pc = nn; 24 } else { 12 }
-            }
+            // ── CALL ─────────────────────────────────────────────────────────
+            0xCD => { let nn = self.fetch_word(); let r = self.regs.pc; self.stack_push(r); self.regs.pc = nn; 24 }
+            0xC4 => { let nn = self.fetch_word(); if !self.regs.flag_z() { let r = self.regs.pc; self.stack_push(r); self.regs.pc = nn; 24 } else { 12 } }
+            0xCC => { let nn = self.fetch_word(); if  self.regs.flag_z() { let r = self.regs.pc; self.stack_push(r); self.regs.pc = nn; 24 } else { 12 } }
+            0xD4 => { let nn = self.fetch_word(); if !self.regs.flag_c() { let r = self.regs.pc; self.stack_push(r); self.regs.pc = nn; 24 } else { 12 } }
+            0xDC => { let nn = self.fetch_word(); if  self.regs.flag_c() { let r = self.regs.pc; self.stack_push(r); self.regs.pc = nn; 24 } else { 12 } }
 
             // ── RET ──────────────────────────────────────────────────────────
-            0xC9 => {
-                let addr = self.stack_pop();
-                self.regs.pc = addr;
-                16
-            }
+            0xC9 => { let a = self.stack_pop(); self.regs.pc = a; 16 }
+            0xC0 => { if !self.regs.flag_z() { let a = self.stack_pop(); self.regs.pc = a; 20 } else { 8 } }
+            0xC8 => { if  self.regs.flag_z() { let a = self.stack_pop(); self.regs.pc = a; 20 } else { 8 } }
+            0xD0 => { if !self.regs.flag_c() { let a = self.stack_pop(); self.regs.pc = a; 20 } else { 8 } }
+            0xD8 => { if  self.regs.flag_c() { let a = self.stack_pop(); self.regs.pc = a; 20 } else { 8 } }
 
-            // ── RET cc ───────────────────────────────────────────────────────
-            0xC0 => { // RET NZ
-                if !self.regs.flag_z() { let a = self.stack_pop(); self.regs.pc = a; 20 } else { 8 }
-            }
-            0xC8 => { // RET Z
-                if self.regs.flag_z() { let a = self.stack_pop(); self.regs.pc = a; 20 } else { 8 }
-            }
-            0xD0 => { // RET NC
-                if !self.regs.flag_c() { let a = self.stack_pop(); self.regs.pc = a; 20 } else { 8 }
-            }
-            0xD8 => { // RET C
-                if self.regs.flag_c() { let a = self.stack_pop(); self.regs.pc = a; 20 } else { 8 }
-            }
+            // ── Interrupt control ─────────────────────────────────────────────
+            0xF3 => { self.ime = false; 4 }
+            0xFB => { self.ime = true;  4 }
 
-            // ── Interrupt control ────────────────────────────────────────────
-            0xF3 => { self.ime = false; 4 } // DI
-            0xFB => { self.ime = true;  4 } // EI
-
-            // ── Unimplemented ────────────────────────────────────────────────
+            // ── Unimplemented ─────────────────────────────────────────────────
             unknown => {
                 log::warn!(
                     "Unimplemented opcode 0x{:02X} at PC=0x{:04X}",
