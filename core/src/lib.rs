@@ -2,7 +2,9 @@
 
 pub mod cartridge;
 pub mod cpu;
+pub mod input;
 pub mod mmu;
+pub mod ppu;
 pub mod timer;
 
 pub fn version() -> &'static str {
