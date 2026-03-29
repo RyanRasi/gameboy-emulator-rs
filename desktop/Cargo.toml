@@ -3,7 +3,12 @@ name = "desktop"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "desktop"
+path = "src/main.rs"
+
 [dependencies]
 core = { path = "../core" }
 log = "0.4"
 env_logger = "0.11"
+minifb = "0.25"
