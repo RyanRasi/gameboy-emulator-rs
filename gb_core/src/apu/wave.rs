@@ -81,20 +81,21 @@ impl WaveChannel {
         let byte_index = (self.position / 2) as usize;
         let byte       = self.wave_ram[byte_index];
         let nibble: u8 = if self.position % 2 == 0 {
-            byte >> 4         // high nibble first
+            byte >> 4
         } else {
             byte & 0x0F
         };
 
+        // volume_code 0 = true mute (DAC outputs nothing)
+        if self.volume_code == 0 { return 0.0; }
+
         let shifted = match self.volume_code {
-            0 => 0,           // mute
-            1 => nibble,      // 100%
-            2 => nibble >> 1, // 50%
-            3 => nibble >> 2, // 25%
+            1 => nibble,
+            2 => nibble >> 1,
+            3 => nibble >> 2,
             _ => 0,
         };
 
-        // Map 0–15 → –1.0 … +1.0
         shifted as f32 / 7.5 - 1.0
     }
 
@@ -192,12 +193,10 @@ mod tests {
 
     #[test]
     fn test_sample_muted_when_volume_code_0() {
-        let ch = triggered_wave(1000, 0, [0xFF; 16]);
-        assert_eq!(ch.sample(), 0.0 / 7.5 - 1.0); // nibble=0 → -1.0... wait: 0>>4=0
-        // volume_code=0 → shifted=0 → 0/7.5-1.0 = -1.0
-        // but DAC with 0 output = -1.0 (not silence). Actually mute = shifted=0 = DAC min.
-        // This is correct DMG behavior.
-        assert!((ch.sample() - (-1.0)).abs() < 1e-5);
+        let mut ram = [0u8; 16];
+        ram[0] = 0xF0;
+        let ch = triggered_wave(1000, 0, ram); // volume_code=0 → true mute
+        assert_eq!(ch.sample(), 0.0, "volume_code=0 must return true silence");
     }
 
     #[test]

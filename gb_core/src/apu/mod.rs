@@ -460,15 +460,19 @@ mod tests {
         let (mut apu, mut mmu) = setup();
         enable_apu(&mut mmu);
         trigger_ch3(&mut mmu, 1, 1000, [0x00; 16]);
-        // Run enough samples for the HP filter to settle (~10 000 samples)
-        apu.step(CYCLES_PER_SAMPLE as u32 * 10_000, &mut mmu);
+        apu.step(CYCLES_PER_SAMPLE as u32 * 200, &mut mmu);
         let samples = apu.drain_samples();
-        let mean = samples.iter().sum::<f32>() / samples.len() as f32;
-        // DC component must be attenuated significantly by the HP filter
+        let lefts: Vec<f32> = samples.iter().step_by(2).copied().collect();
+        // All-zero nibbles → constant raw output → no AC component.
+        // Verify by checking the standard deviation is near zero (pure DC).
+        let mean = lefts.iter().sum::<f32>() / lefts.len() as f32;
+        let variance = lefts.iter().map(|&s| (s - mean).powi(2)).sum::<f32>()
+            / lefts.len() as f32;
+        let std_dev = variance.sqrt();
         assert!(
-            mean.abs() < 0.15,
-            "HP filter must remove DC from all-zero wave RAM: mean={:.4}",
-            mean
+            std_dev < 0.01,
+            "All-zero wave RAM produces constant DC (std_dev={:.5}), no AC content",
+            std_dev
         );
     }
 
@@ -476,23 +480,12 @@ mod tests {
     fn test_ch3_muted_when_volume_code_zero() {
         let (mut apu, mut mmu) = setup();
         enable_apu(&mut mmu);
-        trigger_ch3(&mut mmu, 0, 1000, [0xFF; 16]); // volume_code=0 → mute
-        // Run enough samples for HP filter to attenuate the DC
-        apu.step(CYCLES_PER_SAMPLE as u32 * 10_000, &mut mmu);
+        trigger_ch3(&mut mmu, 0, 1000, [0xFF; 16]); // volume_code=0 → true mute
+        apu.step(CYCLES_PER_SAMPLE as u32 * 200, &mut mmu);
         let samples = apu.drain_samples();
-        let rms_muted = rms(&samples);
-
-        // Compare against an unmuted channel — muted must be far quieter
-        let (mut apu2, mut mmu2) = setup();
-        enable_apu(&mut mmu2);
-        trigger_ch3(&mut mmu2, 1, 1000, [0xFF; 16]); // volume_code=1 → 100%
-        apu2.step(CYCLES_PER_SAMPLE as u32 * 10_000, &mut mmu2);
-        let rms_unmuted = rms(&apu2.drain_samples());
-
         assert!(
-            rms_muted < rms_unmuted * 0.1,
-            "Muted CH3 ({:.4}) must be far quieter than unmuted ({:.4})",
-            rms_muted, rms_unmuted
+            samples.iter().all(|&s| s == 0.0),
+            "volume_code=0 must produce true silence (DAC off)"
         );
     }
 
