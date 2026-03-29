@@ -66,18 +66,18 @@ A modular, cycle-accurate Game Boy emulator written in Rust with desktop and web
 	- [x] arithmetic
 	- [x] jumps
 	- [x] stack
-- [ ] INTERRUPTS
+- [x] INTERRUPTS
 	- [x] Implement interrupt registers (IE, IF) and IME flag
-	- [ ] Handle interrupt priority + execution (jump to ISR)
-	- [ ] Integrate interrupts into CPU step cycle
-- [ ] TIMERS
-	- [ ] Implement DIV, TIMA, TMA, TAC registers
-	- [ ] Increment timers based on CPU cycles
-	- [ ] Trigger timer interrupt on overflow
-- [ ] Cartridge System
-	- [ ] Load and parse ROM file (header + metadata)
-	- [ ] Implement ROM-only and MBC1 bank switching
-	- [ ] Map cartridge reads/writes through MMU
+	- [x] Handle interrupt priority + execution (jump to ISR)
+	- [x] Integrate interrupts into CPU step cycle
+- [x] TIMERS
+	- [x] Implement DIV, TIMA, TMA, TAC registers
+	- [x] Increment timers based on CPU cycles
+	- [x] Trigger timer interrupt on overflow
+- [x] Cartridge System
+	- [x] Load and parse ROM file (header + metadata)
+	- [x] Implement ROM-only and MBC1 bank switching
+	- [x] Map cartridge reads/writes through MMU
 - [ ] PPU (Graphics)
 	- [ ] Implement scanline pipeline + PPU modes
 	- [ ] Render background tiles to framebuffer
