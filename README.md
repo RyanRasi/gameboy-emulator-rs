@@ -49,6 +49,47 @@ A modular, cycle-accurate Game Boy emulator written in Rust with desktop and web
 
 🚧 Game Boy Color (CGB) — planned
 
+## 🛠️ Setup
+
+1. Clone repo
+``` bash
+git clone https://github.com/RyanRasi/gameboy-emulator-rs.git
+cd gameboy-emulator-rs
+```
+2. Build and test project
+``` bash
+cargo build
+cargo test -p gb_core
+cargo test -p desktop
+cargo test -p web
+```
+
+3. Run project with either
+
+   a. Desktop
+	``` bash
+	cargo run -p desktop "roms/rom_name.gb"
+	```
+	or
+
+	b. WebServer
+	``` bash
+	cargo run -p web
+	```
+	Then open ```/web/index.html```
+
+## 🕹️ Controls
+
+| Original GB control | Keyboard Mapping |
+|--|--|
+| D-Pad | Arrow Keys |
+| A | Z |
+| B | X |
+| Start | Enter |
+| Select | Right Shift |
+
+When running in Desktop mode, use ```esc``` to quit
+
 ## ⚡ Status
 
  - [x] **Memory (MMU)**
