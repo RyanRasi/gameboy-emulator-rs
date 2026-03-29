@@ -51,62 +51,62 @@ A modular, cycle-accurate Game Boy emulator written in Rust with desktop and web
 
 ## ⚡ Status
 
- - [x] Memory (MMU)
+ - [x] **Memory (MMU)**
 	 - [x] Full Game Boy memory map
 	 - [x] Read/write system
 	 - [x] ROM + BIOS overlay logic
- - [x] CPU CORE
+ - [x] **CPU Core**
 	 - [x] Registers:
 		- [x] A F B C D E H L
 		- [x] PC SP
 	 - [x] Instructions:
 		 - [x] NOP
 		 - [x] LD r, n
-- [x] CPU EXPANSION
+- [x] **CPU Expansion**
 	- [x] arithmetic
 	- [x] jumps
 	- [x] stack
-- [x] INTERRUPTS
+- [x] **Interrupts**
 	- [x] Implement interrupt registers (IE, IF) and IME flag
 	- [x] Handle interrupt priority + execution (jump to ISR)
 	- [x] Integrate interrupts into CPU step cycle
-- [x] TIMERS
+- [x] **Times**
 	- [x] Implement DIV, TIMA, TMA, TAC registers
 	- [x] Increment timers based on CPU cycles
 	- [x] Trigger timer interrupt on overflow
-- [x] Cartridge System
+- [x] **Cartridge System**
 	- [x] Load and parse ROM file (header + metadata)
 	- [x] Implement ROM-only and MBC1 bank switching
 	- [x] Map cartridge reads/writes through MMU
-- [ ] PPU (Graphics)
+- [ ] **PPU (Graphics)**
 	- [ ] Implement scanline pipeline + PPU modes
 	- [ ] Render background tiles to framebuffer
 	- [ ] Add sprite rendering + VBlank signaling
-- [ ] Input
+- [ ] **Input**
 	- [ ] Map user input to Game Boy buttons
 	- [ ] Update joypad register (0xFF00)
 	- [ ] Handle press/release state correctly
-- [ ] Desktop App
+- [ ] **Desktop App**
 	- [ ] Create window + rendering loop
 	- [ ] Display framebuffer at ~60 FPS
 	- [ ] Capture keyboard input and pass to core
-- [ ] Web Server
+- [ ] **Web Server**
 	- [ ] Implement ROM + BIOS upload endpoints
 	- [ ] Run emulator instance headlessly
 	- [ ] Serve frames (HTTP or WebSocket stream)
-- [ ] Audio (APU)
+- [ ] **Audio (APU)**
 	- [ ] Stub audio system (no sound)
 	- [ ] Implement basic sound channels (square, wave, noise)
 	- [ ] Output mixed audio stream
-- [ ] Testing & Validation
-	- [ ] Run CPU test ROMs (instruction accuracy) BLAARG Tests
+- [ ] **Testing & Validation**
+	- [ ] Run CPU test ROMs (instruction accuracy) Blargg's Tests
 	- [ ] Validate PPU output with test ROMs
 	- [ ] Add regression tests for stability
-- [ ] Save States
+- [ ] **Save States**
 	- [ ] Serialize emulator state (CPU, memory, PPU)
 	- [ ] Implement save/load state functions
 	- [ ] Ensure deterministic restore
-- [ ] Colour Game Boy Upgrade
+- [ ] **Colour Game Boy Upgrade**
 	- [ ] Mode detection
 	- [ ] VRAM banking
 	- [ ] WRAM banking
