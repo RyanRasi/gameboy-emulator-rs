@@ -149,6 +149,20 @@ impl Mmu {
             }
             0xFE00..=0xFE9F => self.oam[(addr - 0xFE00) as usize] = value,
             0xFEA0..=0xFEFF => {}
+
+            // ── OAM DMA ──────────────────────────────────────────────────────────
+            // Writing to 0xFF46 triggers an instant copy of 160 bytes from
+            // (value × 0x100) into OAM (0xFE00–0xFE9F).
+            // Games use this every VBlank to update sprite positions/tiles.
+            0xFF46 => {
+                let src = (value as u16) << 8;
+                for i in 0..0xA0u16 {
+                    let byte = self.read_byte(src + i);
+                    self.oam[i as usize] = byte;
+                }
+                self.io[0x46] = value; // record the last DMA source
+            }
+
             0xFF00..=0xFF7F => self.io[(addr - 0xFF00) as usize] = value,
             0xFF80..=0xFFFE => self.hram[(addr - 0xFF80) as usize] = value,
             0xFFFF          => self.ie = value,
@@ -404,5 +418,52 @@ mod tests {
         mmu.write_byte(0x0000, 0x0A); // enable RAM
         mmu.write_byte(0xA000, 0x55);
         assert_eq!(mmu.read_byte(0xA000), 0x55);
+    }
+
+// ── OAM DMA ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_oam_dma_copies_160_bytes_from_source() {
+        let mut mmu = Mmu::new();
+        // Fill WRAM at 0xC000 with recognisable values
+        for i in 0..0xA0u16 {
+            mmu.write_byte(0xC000 + i, (i & 0xFF) as u8);
+        }
+        // Trigger DMA: source = 0xC0 → 0xC000
+        mmu.write_byte(0xFF46, 0xC0);
+        // Verify OAM was populated
+        for i in 0..0xA0u16 {
+            assert_eq!(
+                mmu.read_byte(0xFE00 + i),
+                (i & 0xFF) as u8,
+                "OAM byte {} must match DMA source",
+                i
+            );
+        }
+    }
+
+    #[test]
+    fn test_oam_dma_from_rom_region() {
+        let mut mmu = Mmu::new();
+        let mut rom = vec![0u8; 0x8000];
+        for i in 0..0xA0usize { rom[0x0200 + i] = i as u8; }
+        mmu.load_rom(&rom).unwrap();
+        // Source = 0x02 → 0x0200
+        mmu.write_byte(0xFF46, 0x02);
+        for i in 0..0xA0u16 {
+            assert_eq!(
+                mmu.read_byte(0xFE00 + i),
+                i as u8,
+                "OAM byte {} must match ROM DMA source",
+                i
+            );
+        }
+    }
+
+    #[test]
+    fn test_oam_dma_records_source_register() {
+        let mut mmu = Mmu::new();
+        mmu.write_byte(0xFF46, 0xC0);
+        assert_eq!(mmu.read_byte(0xFF46), 0xC0);
     }
 }
