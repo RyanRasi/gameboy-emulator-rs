@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>GB Emulator</title>
+  <style>
+    body { background: #1a1a1a; display: flex; flex-direction: column; align-items: center; font-family: monospace; color: white; }
+    canvas { image-rendering: pixelated; border: 2px solid #444; margin: 20px; }
+    button { margin: 4px; padding: 8px 16px; font-size: 14px; cursor: pointer; }
+    #controls { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px; }
+    #status { margin: 10px; color: #aaa; }
+    input[type=file] { margin: 10px; }
+  </style>
+</head>
+<body>
+  <h2>Game Boy Emulator</h2>
+  <input type="file" id="romFile" accept=".gb,.gbc" />
+  <button onclick="startEmulator()">▶ Start</button>
+  <div id="status">No ROM loaded</div>
+  <canvas id="screen" width="160" height="144" style="width:480px;height:432px"></canvas>
+
+  <div id="controls">
+    <div></div>
+    <button onmousedown="press('up')"    onmouseup="release('up')">▲</button>
+    <div></div>
+    <div></div>
+    <button onmousedown="press('left')"  onmouseup="release('left')">◀</button>
+    <button onmousedown="press('down')"  onmouseup="release('down')">▼</button>
+    <button onmousedown="press('right')" onmouseup="release('right')">▶</button>
+    <div></div>
+    <button onmousedown="press('b')"      onmouseup="release('b')">B</button>
+    <button onmousedown="press('a')"      onmouseup="release('a')">A</button>
+    <button onmousedown="press('select')" onmouseup="release('select')">Select</button>
+    <button onmousedown="press('start')"  onmouseup="release('start')">Start</button>
+  </div>
+
+  <script>
+    const API = 'http://localhost:3000';
+    const canvas = document.getElementById('screen');
+    const ctx = canvas.getContext('2d');
+    const palette = [
+      [255,255,255], [170,170,170], [85,85,85], [0,0,0]
+    ];
+    let running = false;
+
+    document.getElementById('romFile').addEventListener('change', async e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const data = await file.arrayBuffer();
+      const resp = await fetch(`${API}/rom`, { method:'POST', body: data });
+      const json = await resp.json();
+      document.getElementById('status').textContent = json.message || json.error;
+    });
+
+    async function startEmulator() {
+      const resp = await fetch(`${API}/start`, { method:'POST' });
+      const json = await resp.json();
+      document.getElementById('status').textContent = json.message;
+      if (resp.ok) { running = true; requestAnimationFrame(loop); }
+    }
+
+    async function loop() {
+      if (!running) return;
+      const resp = await fetch(`${API}/frame`, { method:'POST' });
+      if (!resp.ok) { running = false; return; }
+      const { framebuffer } = await resp.json();
+
+      // Decode base64
+      const raw = atob(framebuffer);
+      const img = ctx.createImageData(160, 144);
+      for (let i = 0; i < raw.length; i++) {
+        const shade = raw.charCodeAt(i) & 3;
+        const [r,g,b] = palette[shade];
+        img.data[i*4]   = r;
+        img.data[i*4+1] = g;
+        img.data[i*4+2] = b;
+        img.data[i*4+3] = 255;
+      }
+      ctx.putImageData(img, 0, 0);
+      requestAnimationFrame(loop);
+    }
+
+    async function press(btn) {
+      await fetch(`${API}/press/${btn}`, { method:'POST' });
+    }
+    async function release(btn) {
+      await fetch(`${API}/release/${btn}`, { method:'POST' });
+    }
+
+    // Keyboard support
+    const keyMap = {
+      'z':'a', 'x':'b', 'Enter':'start', 'Backspace':'select',
+      'ArrowUp':'up', 'ArrowDown':'down', 'ArrowLeft':'left', 'ArrowRight':'right'
+    };
+    document.addEventListener('keydown', e => { if (keyMap[e.key]) { e.preventDefault(); press(keyMap[e.key]); }});
+    document.addEventListener('keyup',   e => { if (keyMap[e.key]) { e.preventDefault(); release(keyMap[e.key]); }});
+  </script>
+</body>
+</html>
