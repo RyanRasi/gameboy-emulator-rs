@@ -8,7 +8,7 @@ name = "desktop"
 path = "src/main.rs"
 
 [dependencies]
-core = { path = "../core" }
+gb_core = { path = "../gb_core" }
 log = "0.4"
 env_logger = "0.11"
 minifb = "0.25"

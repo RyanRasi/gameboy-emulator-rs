@@ -8,7 +8,7 @@
 //!   Arrow keys → D-pad
 
 use minifb::Key;
-use core::input::Button;
+use gb_core::input::Button;
 
 /// Map a minifb `Key` to a Game Boy `Button`.
 /// Returns `None` for unmapped keys.

@@ -6,7 +6,7 @@
 //! The runner is pure logic — no windowing, no I/O. This keeps it fully
 //! testable in a headless environment.
 
-use core::cpu::Cpu;
+use gb_core::cpu::Cpu;
 
 /// Total T-cycles in one Game Boy frame:
 ///   154 scanlines × 456 T-cycles = 70,224
@@ -55,8 +55,8 @@ impl FrameRunner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core::cpu::Cpu;
-    use core::ppu::{LCDC_ADDR, BGP_ADDR};
+    use gb_core::cpu::Cpu;
+    use gb_core::ppu::{LCDC_ADDR, BGP_ADDR};
 
     fn runner_with_lcd() -> FrameRunner {
         let mut cpu = Cpu::new();
@@ -151,7 +151,7 @@ mod tests {
         runner.run_frame();
         // frame_ready fires when VBlank begins (LY = 144).
         // LY wraps to 0 only after the full VBlank period completes.
-        let ly = runner.cpu.mmu.read_byte(core::ppu::LY_ADDR);
+        let ly = runner.cpu.mmu.read_byte(gb_core::ppu::LY_ADDR);
         assert_eq!(ly, 144, "LY must be 144 at VBlank start (when frame_ready fires)");
     }
 
@@ -194,7 +194,7 @@ mod tests {
         runner.run_frame();
         assert_eq!(
             runner.cpu.ppu.framebuffer.len(),
-            core::ppu::FRAMEBUFFER_SIZE,
+            gb_core::ppu::FRAMEBUFFER_SIZE,
             "Framebuffer must be exactly 160×144 bytes"
         );
     }

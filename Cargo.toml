@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "core",
+    "gb_core",
     "desktop",
     "web",
 ]

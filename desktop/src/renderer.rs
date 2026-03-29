@@ -6,7 +6,7 @@
 //! The DMG has four shades mapped to a classic green-tinted palette
 //! (or monochrome white-to-black depending on preference — easily swapped).
 
-use core::ppu::FRAMEBUFFER_SIZE;
+use gb_core::ppu::FRAMEBUFFER_SIZE;
 
 /// Classic DMG-style monochrome palette — shade 0 = lightest, 3 = darkest.
 /// Format: 0x00RRGGBB (minifb native).

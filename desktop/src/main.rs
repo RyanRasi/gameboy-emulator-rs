@@ -15,9 +15,9 @@ mod renderer;
 mod keymap;
 
 use minifb::{Key, Window, WindowOptions, Scale};
-use core::cpu::Cpu;
-use core::cartridge::Cartridge;
-use core::ppu::{SCREEN_WIDTH, SCREEN_HEIGHT, LCDC_ADDR, BGP_ADDR};
+use gb_core::cpu::Cpu;
+use gb_core::cartridge::Cartridge;
+use gb_core::ppu::{SCREEN_WIDTH, SCREEN_HEIGHT, LCDC_ADDR, BGP_ADDR};
 
 fn main() {
     env_logger::init();
