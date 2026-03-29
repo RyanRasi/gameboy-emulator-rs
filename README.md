@@ -78,22 +78,22 @@ A modular, cycle-accurate Game Boy emulator written in Rust with desktop and web
 	- [x] Load and parse ROM file (header + metadata)
 	- [x] Implement ROM-only and MBC1 bank switching
 	- [x] Map cartridge reads/writes through MMU
-- [ ] **PPU (Graphics)**
-	- [ ] Implement scanline pipeline + PPU modes
-	- [ ] Render background tiles to framebuffer
-	- [ ] Add sprite rendering + VBlank signaling
-- [ ] **Input**
-	- [ ] Map user input to Game Boy buttons
-	- [ ] Update joypad register (0xFF00)
-	- [ ] Handle press/release state correctly
-- [ ] **Desktop App**
-	- [ ] Create window + rendering loop
-	- [ ] Display framebuffer at ~60 FPS
-	- [ ] Capture keyboard input and pass to core
-- [ ] **Web Server**
-	- [ ] Implement ROM + BIOS upload endpoints
-	- [ ] Run emulator instance headlessly
-	- [ ] Serve frames (HTTP or WebSocket stream)
+- [x] **PPU (Graphics)**
+	- [x] Implement scanline pipeline + PPU modes
+	- [x] Render background tiles to framebuffer
+	- [x] Add sprite rendering + VBlank signaling
+- [x] **Input**
+	- [x] Map user input to Game Boy buttons
+	- [x] Update joypad register (0xFF00)
+	- [x] Handle press/release state correctly
+- [x] **Desktop App**
+	- [x] Create window + rendering loop
+	- [x] Display framebuffer at ~60 FPS
+	- [x] Capture keyboard input and pass to core
+- [x] **Web Server**
+	- [x] Implement ROM + BIOS upload endpoints
+	- [x] Run emulator instance headlessly
+	- [x] Serve frames (HTTP or WebSocket stream)
 - [ ] **Audio (APU)**
 	- [ ] Stub audio system (no sound)
 	- [ ] Implement basic sound channels (square, wave, noise)
