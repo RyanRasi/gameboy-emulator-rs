@@ -1,5 +1,6 @@
 //! Game Boy DMG emulator core — pure logic, zero I/O dependencies.
 
+pub mod apu;
 pub mod cartridge;
 pub mod cpu;
 pub mod input;

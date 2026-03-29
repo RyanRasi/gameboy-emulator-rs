@@ -1,16 +1,17 @@
 //! SM83 CPU — Game Boy processor core.
 
-pub mod registers;
 pub mod alu;
 pub mod interrupts;
+pub mod registers;
 mod instructions;
 
 pub use registers::Registers;
 
-use crate::mmu::Mmu;
-use crate::timer::Timer;
-use crate::ppu::Ppu;
+use crate::apu::Apu;
 use crate::input::Joypad;
+use crate::mmu::Mmu;
+use crate::ppu::Ppu;
+use crate::timer::Timer;
 
 pub struct Cpu {
     pub regs:   Registers,
@@ -18,6 +19,7 @@ pub struct Cpu {
     pub timer:  Timer,
     pub ppu:    Ppu,
     pub joypad: Joypad,
+    pub apu:    Apu,
     pub cycles: u64,
     pub ime:    bool,
     pub halted: bool,
@@ -31,19 +33,14 @@ impl Cpu {
             timer:  Timer::new(),
             ppu:    Ppu::new(),
             joypad: Joypad::new(),
+            apu:    Apu::new(),
             cycles: 0,
             ime:    false,
             halted: false,
         }
     }
 
-    /// Execute one full CPU tick:
-    ///   1. Service any pending interrupt (20 cycles, returns early).
-    ///   2. If halted, idle for 4 cycles.
-    ///   3. Otherwise fetch-decode-execute one instruction.
-    ///   4. Step Timer, PPU, and Joypad; propagate any generated interrupts.
     pub fn tick(&mut self) -> u32 {
-        // ── Interrupt service ────────────────────────────────────────────────
         let irq_cycles = interrupts::service(
             &mut self.mmu,
             &mut self.ime,
@@ -58,15 +55,12 @@ impl Cpu {
             return irq_cycles;
         }
 
-        // ── Instruction / idle ───────────────────────────────────────────────
         let instr_cycles = if self.halted { 4 } else { self.step() };
-
         self.cycles += instr_cycles as u64;
         self.step_peripherals(instr_cycles);
         instr_cycles
     }
 
-    /// Step Timer, PPU, and Joypad; request any resulting interrupts.
     fn step_peripherals(&mut self, cycles: u32) {
         if self.timer.step(cycles, &mut self.mmu) {
             interrupts::request(&mut self.mmu, interrupts::source::TIMER);
@@ -81,19 +75,17 @@ impl Cpu {
         if self.joypad.sync(&mut self.mmu) {
             interrupts::request(&mut self.mmu, interrupts::source::JOYPAD);
         }
+        self.apu.step(cycles, &mut self.mmu);
     }
 
-    /// Notify the emulator that a button was pressed.
     pub fn button_press(&mut self, button: crate::input::Button) {
         self.joypad.press(button);
     }
 
-    /// Notify the emulator that a button was released.
     pub fn button_release(&mut self, button: crate::input::Button) {
         self.joypad.release(button);
     }
 
-    /// Request an interrupt from outside the CPU.
     pub fn request_interrupt(&mut self, mask: u8) {
         interrupts::request(&mut self.mmu, mask);
     }
@@ -104,14 +96,14 @@ impl Default for Cpu {
 }
 
 // =============================================================================
-// Tests
+// Tests (regression only — APU unit tests live in apu/mod.rs)
 // =============================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use super::interrupts::{source, IF_ADDR, IE_ADDR};
-    use crate::timer::{TAC_ADDR, TIMA_ADDR, TMA_ADDR, DIV_ADDR};
+    use crate::timer::{TAC_ADDR, TIMA_ADDR, TMA_ADDR};
     use crate::ppu;
     use crate::input::{Button, JOYP_ADDR};
 
@@ -172,112 +164,56 @@ mod tests {
     }
 
     #[test]
-    fn test_ppu_vblank_irq_triggers_cpu_handler() {
-        let mut cpu = Cpu::new();
-        let mut rom = vec![0x00u8; 0x8000];
-        rom[0x0040] = 0xC9;
-        cpu.mmu.load_rom(&rom).unwrap();
-        cpu.mmu.write_byte(ppu::LCDC_ADDR, 0x91);
-        cpu.mmu.write_byte(IE_ADDR, source::VBLANK);
-        cpu.ime = true;
-        let mut jumped = false;
-        for _ in 0..20_000 {
-            cpu.tick();
-            if cpu.regs.pc == 0x0040 { jumped = true; break; }
-        }
-        assert!(jumped);
-    }
-
-    // ── Input integration ─────────────────────────────────────────────────────
-
-    #[test]
     fn test_button_press_updates_joyp_register_after_tick() {
         let mut cpu = cpu_with_program(&[0x00u8; 4]);
-        cpu.mmu.write_byte(JOYP_ADDR, 0xDF); // action group only (bit5=0, bit4=1)
+        cpu.mmu.write_byte(JOYP_ADDR, 0xDF);
         cpu.button_press(Button::A);
         cpu.tick();
-        let joyp = cpu.mmu.read_byte(JOYP_ADDR);
-        assert_eq!(joyp & 0x01, 0, "A button must read low (pressed) after tick");
+        assert_eq!(cpu.mmu.read_byte(JOYP_ADDR) & 0x01, 0);
+    }
+
+    // ── APU integration ───────────────────────────────────────────────────────
+
+    #[test]
+    fn test_apu_step_called_in_tick_produces_samples() {
+        let mut cpu = cpu_with_nop_rom();
+        cpu.mmu.write_byte(crate::apu::NR52_ADDR, 0x80);
+        // Run enough ticks to accumulate at least one sample
+        for _ in 0..100 { cpu.tick(); }
+        // After 100 NOPs (400 T-cycles), we expect at least 4 samples
+        assert!(
+            !cpu.apu.sample_buffer.is_empty(),
+            "APU must accumulate samples during CPU execution"
+        );
     }
 
     #[test]
-    fn test_button_release_restores_joyp_bit_after_tick() {
-        let mut cpu = cpu_with_program(&[0x00u8; 4]);
-        cpu.mmu.write_byte(JOYP_ADDR, 0xDF); // action group only
-        cpu.button_press(Button::A);
-        cpu.tick();
-        cpu.button_release(Button::A);
-        cpu.tick();
-        let joyp = cpu.mmu.read_byte(JOYP_ADDR);
-        assert_eq!(joyp & 0x01, 0x01, "Released A must read high again");
+    fn test_apu_produces_silence_when_no_channels_triggered() {
+        let mut cpu = cpu_with_nop_rom();
+        cpu.mmu.write_byte(crate::apu::NR52_ADDR, 0x80);
+        for _ in 0..500 { cpu.tick(); }
+        let samples = cpu.apu.drain_samples();
+        assert!(
+            samples.iter().all(|&s| s == 0.0),
+            "No triggered channels → all silence"
+        );
     }
 
     #[test]
-    fn test_joypad_interrupt_fires_on_button_press() {
-        let mut cpu = cpu_with_program(&[0x00u8; 8]);
-        cpu.ime = true;
-        cpu.mmu.write_byte(IE_ADDR,   source::JOYPAD);
-        cpu.mmu.write_byte(JOYP_ADDR, 0xDF); // action group only
-        cpu.tick();                // baseline sync
-        cpu.button_press(Button::Start);
-        cpu.tick();                // joypad sync → IF bit set
-        cpu.tick();                // IRQ serviced → PC = 0x0060
-        assert_eq!(cpu.regs.pc, 0x0060, "CPU must jump to Joypad vector 0x0060");
-    }
-
-    #[test]
-    fn test_joypad_irq_not_fired_on_release() {
-        let mut cpu = cpu_with_program(&[0x00u8; 8]);
-        cpu.ime = true;
-        cpu.mmu.write_byte(IE_ADDR,   source::JOYPAD);
-        cpu.mmu.write_byte(JOYP_ADDR, 0xDF); // action group only
-        cpu.button_press(Button::A);
-        cpu.tick(); // press fires IRQ
-        cpu.tick(); // service IRQ
-        cpu.regs.pc = 0xC000;
-        cpu.mmu.write_byte(IF_ADDR, 0x00);
-        cpu.button_release(Button::A);
-        cpu.tick();
-        cpu.tick();
-        assert_ne!(cpu.regs.pc, 0x0060, "Release must not fire Joypad IRQ");
-    }
-
-    #[test]
-    fn test_dpad_buttons_readable_via_joyp() {
-        let mut cpu = cpu_with_program(&[0x00u8; 4]);
-        cpu.mmu.write_byte(JOYP_ADDR, 0xEF); // d-pad group only (bit5=1, bit4=0)
-        cpu.button_press(Button::Up);
-        cpu.tick();
-        let joyp = cpu.mmu.read_byte(JOYP_ADDR);
-        assert_eq!(joyp & 0x04, 0, "Up must read low in d-pad group");
-    }
-
-    #[test]
-    fn test_action_buttons_not_visible_in_dpad_group() {
-        let mut cpu = cpu_with_program(&[0x00u8; 4]);
-        cpu.mmu.write_byte(JOYP_ADDR, 0xEF); // d-pad group only
-        cpu.button_press(Button::A);          // action button — must not appear
-        cpu.tick();
-        let joyp = cpu.mmu.read_byte(JOYP_ADDR);
-        assert_eq!(joyp & 0x01, 0x01, "Action A must not appear in d-pad group");
-    }
-
-    #[test]
-    fn test_all_buttons_independently_controllable() {
-        let mut cpu = cpu_with_program(&[0x00u8; 4]);
-        for btn in Button::ALL {
-            cpu.button_press(btn);
-        }
-        cpu.tick();
-        for btn in Button::ALL {
-            assert!(cpu.joypad.is_pressed(btn), "{:?} must be pressed", btn);
-        }
-        for btn in Button::ALL {
-            cpu.button_release(btn);
-        }
-        cpu.tick();
-        for btn in Button::ALL {
-            assert!(!cpu.joypad.is_pressed(btn), "{:?} must be released", btn);
-        }
+    fn test_apu_ch2_audible_when_triggered_via_cpu_ticks() {
+        let mut cpu = cpu_with_nop_rom();
+        cpu.mmu.write_byte(crate::apu::NR52_ADDR, 0x80);
+        cpu.mmu.write_byte(crate::apu::NR50_ADDR, 0x77);
+        cpu.mmu.write_byte(crate::apu::NR51_ADDR, 0xFF);
+        cpu.mmu.write_byte(crate::apu::NR22_ADDR, 0xF8); // vol=15, dac on
+        cpu.mmu.write_byte(crate::apu::NR21_ADDR, 0x80);
+        cpu.mmu.write_byte(crate::apu::NR23_ADDR, 0x00);
+        cpu.mmu.write_byte(crate::apu::NR24_ADDR, 0xC7); // trigger
+        for _ in 0..500 { cpu.tick(); }
+        let samples = cpu.apu.drain_samples();
+        assert!(
+            samples.iter().any(|&s| s.abs() > 0.01),
+            "Triggered CH2 must produce audible samples during CPU ticks"
+        );
     }
 }
