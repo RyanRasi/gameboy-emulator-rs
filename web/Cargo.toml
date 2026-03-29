@@ -1,9 +1,23 @@
 [package]
 name = "web"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+
+[[bin]]
+name = "web"
+path = "src/main.rs"
 
 [dependencies]
-core = { path = "../core" }
+gb_core = { path = "../gb_core" }
 log = "0.4"
 env_logger = "0.11"
+axum = "0.7"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+tower-http = { version = "0.5", features = ["cors"] }
+
+[dev-dependencies]
+axum-test = "14"
+tokio = { version = "1", features = ["full"] }
