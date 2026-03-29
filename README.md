@@ -5,8 +5,15 @@ A modular, cycle-accurate Game Boy emulator written in Rust with desktop and web
 
 ![Rust](https://img.shields.io/badge/rust-1.70+-orange?logo=rust) ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/rust.yml) ![License](https://img.shields.io/github/license/RyanRasi/gameboy-emulator-rs) ![Status](https://img.shields.io/badge/status-in%20development-yellow) ![Platform](https://img.shields.io/badge/platform-cross--platform-blue)
 
+| App | Result |
+|--|--|
+| gb_core | ![Build - gb_core](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/gb_core_rust.yml?label=test)|
+| desktop | ![Build - desktop](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/desktop_rust.yml?label=test)|
+| web | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/web_rust.yml?label=test)|
+
  
 🎮 Preview
+
 (Add a GIF here later of Tetris and Pokémon Yellow running)
 
 ## ✨ Features
