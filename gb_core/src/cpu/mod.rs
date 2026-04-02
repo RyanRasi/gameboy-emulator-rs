@@ -62,6 +62,7 @@ impl Cpu {
     }
 
     fn step_peripherals(&mut self, cycles: u32) {
+        self.mmu.tick_cartridge_rtc(cycles as u64);
         if self.timer.step(cycles, &mut self.mmu) {
             interrupts::request(&mut self.mmu, interrupts::source::TIMER);
         }

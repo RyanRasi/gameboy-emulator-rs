@@ -26,15 +26,22 @@ pub const HEADER_END: usize = 0x0150;
 
 /// MBC type identifiers from byte 0x0147.
 pub mod mbc_type {
-    pub const ROM_ONLY:           u8 = 0x00;
-    pub const MBC1:               u8 = 0x01;
-    pub const MBC1_RAM:           u8 = 0x02;
-    pub const MBC1_RAM_BATTERY:   u8 = 0x03;
-    pub const MBC5:               u8 = 0x19;
-    pub const MBC5_RAM:           u8 = 0x1A;
-    pub const MBC5_RAM_BATTERY:   u8 = 0x1B;
-    pub const MBC5_RUMBLE:        u8 = 0x1C;
-    pub const MBC5_RUMBLE_RAM:    u8 = 0x1D;
+    pub const ROM_ONLY:                u8 = 0x00;
+    pub const MBC1:                    u8 = 0x01;
+    pub const MBC1_RAM:                u8 = 0x02;
+    pub const MBC1_RAM_BATTERY:        u8 = 0x03;
+    pub const MBC2:                    u8 = 0x05;
+    pub const MBC2_BATTERY:            u8 = 0x06;
+    pub const MBC3_TIMER_BATTERY:      u8 = 0x0F;
+    pub const MBC3_TIMER_RAM_BATTERY:  u8 = 0x10;
+    pub const MBC3:                    u8 = 0x11;
+    pub const MBC3_RAM:                u8 = 0x12;
+    pub const MBC3_RAM_BATTERY:        u8 = 0x13;
+    pub const MBC5:                    u8 = 0x19;
+    pub const MBC5_RAM:                u8 = 0x1A;
+    pub const MBC5_RAM_BATTERY:        u8 = 0x1B;
+    pub const MBC5_RUMBLE:             u8 = 0x1C;
+    pub const MBC5_RUMBLE_RAM:         u8 = 0x1D;
     pub const MBC5_RUMBLE_RAM_BATTERY: u8 = 0x1E;
 }
 

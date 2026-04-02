@@ -57,6 +57,13 @@ impl Mmu {
         }
     }
 
+    /// Tick the cartridge RTC (only has effect for MBC3).
+    pub fn tick_cartridge_rtc(&mut self, cycles: u64) {
+        if let Some(ref mut cart) = self.cartridge {
+            cart.tick_rtc(cycles);
+        }
+    }
+
     // ── Cartridge / ROM loading ───────────────────────────────────────────────
 
     /// Load a fully parsed Cartridge (preferred path).
