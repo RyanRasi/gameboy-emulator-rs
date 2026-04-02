@@ -10,7 +10,9 @@
 
 pub mod square;
 pub mod wave;
+pub mod noise;
 
+use noise::NoiseChannel;
 use square::SquareChannel;
 use wave::WaveChannel;
 use crate::mmu::Mmu;
@@ -40,6 +42,10 @@ pub const NR31_ADDR: u16 = 0xFF1B;
 pub const NR32_ADDR: u16 = 0xFF1C;
 pub const NR33_ADDR: u16 = 0xFF1D;
 pub const NR34_ADDR: u16 = 0xFF1E;
+pub const NR41_ADDR: u16 = 0xFF20; // CH4 length
+pub const NR42_ADDR: u16 = 0xFF21; // CH4 volume envelope
+pub const NR43_ADDR: u16 = 0xFF22; // CH4 polynomial counter
+pub const NR44_ADDR: u16 = 0xFF23; // CH4 trigger + length enable
 pub const NR50_ADDR: u16 = 0xFF24;
 pub const NR51_ADDR: u16 = 0xFF25;
 pub const NR52_ADDR: u16 = 0xFF26;
@@ -49,6 +55,7 @@ pub struct Apu {
     pub ch1: SquareChannel,
     pub ch2: SquareChannel,
     pub ch3: WaveChannel,
+    pub ch4: NoiseChannel,
 
     // ── CH1 sweep ─────────────────────────────────────────────────────────────
     ch1_sweep_shadow:  u16,
@@ -77,6 +84,7 @@ impl Apu {
             ch1: SquareChannel::new(),
             ch2: SquareChannel::new(),
             ch3: WaveChannel::new(),
+            ch4: NoiseChannel::new(),
             ch1_sweep_shadow:  0,
             ch1_sweep_timer:   0,
             ch1_sweep_enabled: false,
@@ -115,6 +123,7 @@ impl Apu {
                 self.ch1.step(chunk);
                 self.ch2.step(chunk);
                 self.ch3.step(chunk);
+                self.ch4.clock_length();
             }
 
             // Generate samples at the correct rate
@@ -213,6 +222,29 @@ impl Apu {
             self.ch3.length_counter = 256u16.saturating_sub(nr31 as u16);
             self.ch3.trigger();
         }
+
+        // ── CH4 ───────────────────────────────────────────────────────────────────
+        let nr42 = mmu.read_byte(NR42_ADDR);
+        let nr43 = mmu.read_byte(NR43_ADDR);
+        let nr44 = mmu.read_byte(NR44_ADDR);
+
+        self.ch4.initial_volume = nr42 >> 4;
+        self.ch4.env_add        = nr42 & 0x08 != 0;
+        self.ch4.env_period     = nr42 & 0x07;
+        self.ch4.dac_enabled    = nr42 & 0xF8 != 0;
+        self.ch4.shift_clock    = nr43 >> 4;
+        self.ch4.short_mode     = nr43 & 0x08 != 0;
+        self.ch4.divisor_code   = nr43 & 0x07;
+        self.ch4.length_enabled = nr44 & 0x40 != 0;
+
+        if !self.ch4.dac_enabled { self.ch4.enabled = false; }
+
+        if nr44 & 0x80 != 0 {
+            mmu.write_byte(NR44_ADDR, nr44 & 0x7F);
+            let nr41 = mmu.read_byte(NR41_ADDR);
+            self.ch4.length_counter = 64u16.saturating_sub((nr41 & 0x3F) as u16);
+            self.ch4.trigger();
+        }
     }
 
     fn clock_frame_sequencer(&mut self) {
@@ -221,16 +253,19 @@ impl Apu {
                 self.ch1.clock_length();
                 self.ch2.clock_length();
                 self.ch3.clock_length();
+                self.ch4.clock_length();
             }
             2 | 6 => {
                 self.ch1.clock_length();
                 self.ch2.clock_length();
                 self.ch3.clock_length();
+                self.ch4.clock_length();
                 self.clock_sweep();
             }
             7 => {
                 self.ch1.clock_envelope();
                 self.ch2.clock_envelope();
+                self.ch4.clock_length();
             }
             _ => {}
         }
@@ -271,7 +306,7 @@ impl Apu {
         let ch1 = self.ch1.sample();
         let ch2 = self.ch2.sample();
         let ch3 = self.ch3.sample();
-        let ch4 = 0.0f32; // CH4 stub
+        let ch4 = self.ch4.sample();
 
         let pan = |ch: f32, bit: u8| -> f32 {
             if nr51 & (1 << bit) != 0 { ch } else { 0.0 }
@@ -649,5 +684,33 @@ mod tests {
         let c48 = apu_48.drain_samples().len() / 2;
 
         assert!(c48 > c44, "48 kHz ({}) > 44.1 kHz ({})", c48, c44);
+    }
+
+    #[test]
+    fn test_ch4_noise_produces_nonzero_audio() {
+        let (mut apu, mut mmu) = setup();
+        enable_apu(&mut mmu);
+        // Trigger CH4: vol=15, decrease env, shift=4, div=0, 15-bit mode
+        mmu.write_byte(NR42_ADDR, 0xF0); // vol=15, no envelope
+        mmu.write_byte(NR43_ADDR, 0x40); // shift=4, div=0, 15-bit
+        mmu.write_byte(NR44_ADDR, 0x80); // trigger
+        apu.step(CYCLES_PER_SAMPLE as u32 * 200, &mut mmu);
+        let samples = apu.drain_samples();
+        assert!(
+            samples.iter().any(|&s| s.abs() > 0.01),
+            "CH4 noise must produce audible output"
+        );
+    }
+
+    #[test]
+    fn test_ch4_short_mode_produces_audio() {
+        let (mut apu, mut mmu) = setup();
+        enable_apu(&mut mmu);
+        mmu.write_byte(NR42_ADDR, 0xF0);
+        mmu.write_byte(NR43_ADDR, 0x48); // shift=4, short_mode=1
+        mmu.write_byte(NR44_ADDR, 0x80);
+        apu.step(CYCLES_PER_SAMPLE as u32 * 200, &mut mmu);
+        let samples = apu.drain_samples();
+        assert!(samples.iter().any(|&s| s.abs() > 0.01));
     }
 }
