@@ -33,23 +33,19 @@ const RTC_H:  usize = 2;
 const RTC_DL: usize = 3;
 const RTC_DH: usize = 4;
 
+use serde::{Serialize, Deserialize};
+
 pub struct Mbc3 {
-    rom:         Vec<u8>,
-    ram:         Vec<u8>,
-    rom_bank:    u8,
-    ram_bank:    u8,
-    ram_enabled: bool,
-
-    /// 0x00–0x03 = RAM bank; 0x08–0x0C = RTC register
-    ram_rtc_select: u8,
-
-    // ── RTC ──────────────────────────────────────────────────────────────────
-    rtc: [u8; 5],
-    rtc_latched: [u8; 5],
-    latch_step:  u8, // 0 = waiting for 0x00, 1 = waiting for 0x01
-
-    /// Accumulated T-cycles for RTC tick (4,194,304 per second).
-    rtc_cycles: u64,
+    rom:                    Vec<u8>,
+    pub(crate) ram:            Vec<u8>,
+    pub(crate) rom_bank:       u8,
+    pub(crate) ram_bank:       u8,
+    pub(crate) ram_enabled:    bool,
+    pub(crate) ram_rtc_select: u8,
+    pub(crate) rtc:            [u8; 5],
+    pub(crate) rtc_latched:    [u8; 5],
+    pub(crate) latch_step:     u8,
+    pub(crate) rtc_cycles:     u64,
 }
 
 impl Mbc3 {

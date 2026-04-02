@@ -14,14 +14,15 @@
 const ROM_BANK_SIZE: usize = 0x4000; // 16 KiB
 const RAM_BANK_SIZE: usize = 0x2000; //  8 KiB
 
-pub struct Mbc5 {
-    rom: Vec<u8>,
-    ram: Vec<u8>,
+use serde::{Serialize, Deserialize};
 
-    rom_bank_lo: u8,  // bits 7–0 of bank number
-    rom_bank_hi: u8,  // bit 8 of bank number
-    ram_bank:    u8,  // 4-bit RAM bank selector
-    ram_enabled: bool,
+pub struct Mbc5 {
+    rom:             Vec<u8>,
+    pub(crate) ram:         Vec<u8>,
+    pub(crate) rom_bank_lo: u8,
+    pub(crate) rom_bank_hi: u8,
+    pub(crate) ram_bank:    u8,
+    pub(crate) ram_enabled: bool,
 }
 
 impl Mbc5 {

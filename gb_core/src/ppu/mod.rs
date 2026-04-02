@@ -59,15 +59,18 @@ pub struct PpuResult {
     pub stat_irq:   bool,
 }
 
+use serde::{Serialize, Deserialize};
+
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Ppu {
+    /// Serialized as a flat Vec for serde compatibility.
+    #[serde(with = "serde_framebuffer")]
     pub framebuffer: Box<[u8; FRAMEBUFFER_SIZE]>,
-    /// Tracks which pixels were written by a non-transparent BG/Window pixel.
-    /// Used for sprite priority (sprites hide behind BG color 1–3 when flag set).
+    #[serde(with = "serde_framebuffer")]
     bg_priority:     Box<[bool; FRAMEBUFFER_SIZE]>,
     cycle:           u32,
     mode:            u8,
     pub frame_ready: bool,
-    /// Internal window line counter — increments each time a window line is drawn.
     window_line:     u8,
 }
 
@@ -369,6 +372,30 @@ fn tile_addr(tile_num: u8, use_signed: bool) -> u16 {
         (0x9000i32 + signed * 16) as u16
     } else {
         0x8000u16 + (tile_num as u16) * 16
+    }
+}
+
+// ── Serde helper for Box<[T; FRAMEBUFFER_SIZE]> ───────────────────────────────
+mod serde_framebuffer {
+    use serde::{Deserializer, Serializer, Deserialize};
+    use super::FRAMEBUFFER_SIZE;
+
+    pub fn serialize<S, T>(val: &Box<[T; FRAMEBUFFER_SIZE]>, s: S) -> Result<S::Ok, S::Error>
+    where S: Serializer, T: serde::Serialize {
+        s.collect_seq(val.iter())
+    }
+
+    pub fn deserialize<'de, D, T>(d: D) -> Result<Box<[T; FRAMEBUFFER_SIZE]>, D::Error>
+    where D: Deserializer<'de>, T: serde::Deserialize<'de> + Default + Copy {
+        let v = Vec::<T>::deserialize(d)?;
+        if v.len() != FRAMEBUFFER_SIZE {
+            return Err(serde::de::Error::custom(
+                format!("expected {} elements", FRAMEBUFFER_SIZE)
+            ));
+        }
+        let mut arr = Box::new([T::default(); FRAMEBUFFER_SIZE]);
+        arr.copy_from_slice(&v);
+        Ok(arr)
     }
 }
 

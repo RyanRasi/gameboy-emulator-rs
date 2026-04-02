@@ -16,19 +16,21 @@
 const ROM_BANK_SIZE: usize  = 0x4000; // 16 KiB
 const MBC2_RAM_SIZE: usize  = 512;    // 512 nibbles stored as bytes
 
+use serde::{Serialize, Deserialize};
+
+#[derive(Serialize, Deserialize)]
 pub struct Mbc2 {
-    rom:         Vec<u8>,
-    /// 512-byte internal RAM (only lower nibble valid).
-    ram:         [u8; MBC2_RAM_SIZE],
-    rom_bank:    u8,
-    ram_enabled: bool,
+    rom:             Vec<u8>,
+    pub(crate) ram:         Vec<u8>,
+    pub(crate) rom_bank:    u8,
+    pub(crate) ram_enabled: bool,
 }
 
 impl Mbc2 {
     pub fn new(rom: Vec<u8>) -> Self {
         Mbc2 {
             rom,
-            ram:         [0u8; MBC2_RAM_SIZE],
+            ram:         vec![0u8; MBC2_RAM_SIZE],
             rom_bank:    1,
             ram_enabled: false,
         }
@@ -187,6 +189,7 @@ mod tests {
 
     #[test]
     fn test_ram_size_is_512_bytes() {
-        assert_eq!(MBC2_RAM_SIZE, 512);
+        let mbc = mbc2_with_banks(4);
+        assert_eq!(mbc.ram.len(), MBC2_RAM_SIZE);
     }
 }

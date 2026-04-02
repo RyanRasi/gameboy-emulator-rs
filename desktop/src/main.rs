@@ -114,6 +114,44 @@ fn main() {
         window
             .update_with_buffer(&pixels, SCREEN_WIDTH, SCREEN_HEIGHT)
             .unwrap_or_else(|e| log::error!("Window update: {}", e));
+
+        // After the input handling block, before runner.run_frame():
+
+        // Save state: F5
+        if window.is_key_pressed(Key::F5, minifb::KeyRepeat::No) {
+            use gb_core::save_state::SaveState;
+            let state = SaveState::capture(&runner.cpu);
+            match state.to_bytes() {
+                Ok(bytes) => {
+                    match std::fs::write("save.state", &bytes[..]) {
+                        Ok(_)  => log::info!("State saved ({} bytes)", bytes.len()),
+                        Err(e) => log::error!("Save failed: {}", e),
+                    }
+                }
+                Err(e) => log::error!("Serialize failed: {}", e),
+            }
+        }
+
+        // Load state: F7
+        if window.is_key_pressed(Key::F7, minifb::KeyRepeat::No) {
+            use gb_core::save_state::SaveState;
+            match std::fs::read("save.state") {
+                Ok(bytes) => {
+                    match SaveState::from_bytes(&bytes) {
+                        Ok(state) => {
+                            let result: Result<(), String> = state.restore(&mut runner.cpu);
+                            match result {
+                                Ok(_)  => log::info!("State loaded"),
+                                Err(e) => log::error!("Restore failed: {}", e),
+                            }
+                        }
+                        Err(e) => log::error!("Deserialize failed: {}", e),
+                    }
+                }
+                Err(e) => log::error!("Load failed: {}", e),
+            }
+        }
+
     }
 
     log::info!("Emulator exited after {} frames.", runner.frame_count());

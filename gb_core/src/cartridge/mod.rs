@@ -28,6 +28,46 @@ pub struct Cartridge {
     mbc: Mbc,
 }
 
+use serde::{Serialize, Deserialize};
+
+/// Serializable snapshot of cartridge state.
+/// ROM data is excluded — it must be reloaded from the original file.
+#[derive(Serialize, Deserialize)]
+pub enum CartridgeState {
+    Mbc0,
+    Mbc1 {
+        ram:         Vec<u8>,
+        rom_bank_lo: u8,
+        rom_bank_hi: u8,
+        ram_bank:    u8,
+        ram_enabled: bool,
+        mode:        u8,
+    },
+    Mbc2 {
+        ram:         Vec<u8>,
+        rom_bank:    u8,
+        ram_enabled: bool,
+    },
+    Mbc3 {
+        ram:            Vec<u8>,
+        rom_bank:       u8,
+        ram_bank:       u8,
+        ram_enabled:    bool,
+        ram_rtc_select: u8,
+        rtc:            [u8; 5],
+        rtc_latched:    [u8; 5],
+        latch_step:     u8,
+        rtc_cycles:     u64,
+    },
+    Mbc5 {
+        ram:         Vec<u8>,
+        rom_bank_lo: u8,
+        rom_bank_hi: u8,
+        ram_bank:    u8,
+        ram_enabled: bool,
+    },
+}
+
 impl Cartridge {
     pub fn load(rom: Vec<u8>) -> Result<Self, String> {
         let header = CartridgeHeader::parse(&rom)?;
@@ -114,6 +154,88 @@ impl Cartridge {
             Mbc::Mbc2(m) => m.write_ram(addr, value),
             Mbc::Mbc3(m) => m.write_ram(addr, value),
             Mbc::Mbc5(m) => m.write_ram(addr, value),
+        }
+    }
+
+    /// Extract serializable state (ROM excluded).
+    pub fn save_state(&self) -> CartridgeState {
+        match &self.mbc {
+            Mbc::Mbc0(_) => CartridgeState::Mbc0,
+            Mbc::Mbc1(m) => CartridgeState::Mbc1 {
+                ram:         m.ram.clone(),
+                rom_bank_lo: m.rom_bank_lo,
+                rom_bank_hi: m.rom_bank_hi,
+                ram_bank:    m.ram_bank,
+                ram_enabled: m.ram_enabled,
+                mode:        m.mode,
+            },
+            Mbc::Mbc2(m) => CartridgeState::Mbc2 {
+                ram:         m.ram.clone(),
+                rom_bank:    m.rom_bank,
+                ram_enabled: m.ram_enabled,
+            },
+            Mbc::Mbc3(m) => CartridgeState::Mbc3 {
+                ram:            m.ram.clone(),
+                rom_bank:       m.rom_bank,
+                ram_bank:       m.ram_bank,
+                ram_enabled:    m.ram_enabled,
+                ram_rtc_select: m.ram_rtc_select,
+                rtc:            m.rtc,
+                rtc_latched:    m.rtc_latched,
+                latch_step:     m.latch_step,
+                rtc_cycles:     m.rtc_cycles,
+            },
+            Mbc::Mbc5(m) => CartridgeState::Mbc5 {
+                ram:         m.ram.clone(),
+                rom_bank_lo: m.rom_bank_lo,
+                rom_bank_hi: m.rom_bank_hi,
+                ram_bank:    m.ram_bank,
+                ram_enabled: m.ram_enabled,
+            },
+        }
+    }
+
+    /// Restore mutable state from a snapshot (ROM must already be loaded).
+    pub fn load_state(&mut self, state: CartridgeState) -> Result<(), String> {
+        match (&mut self.mbc, state) {
+            (Mbc::Mbc0(_), CartridgeState::Mbc0) => Ok(()),
+            (Mbc::Mbc1(m), CartridgeState::Mbc1 { ram, rom_bank_lo, rom_bank_hi, ram_bank, ram_enabled, mode }) => {
+                m.ram         = ram;
+                m.rom_bank_lo = rom_bank_lo;
+                m.rom_bank_hi = rom_bank_hi;
+                m.ram_bank    = ram_bank;
+                m.ram_enabled = ram_enabled;
+                m.mode        = mode;
+                Ok(())
+            }
+            (Mbc::Mbc2(m), CartridgeState::Mbc2 { ram, rom_bank, ram_enabled }) => {
+                m.ram         = ram;
+                m.rom_bank    = rom_bank;
+                m.ram_enabled = ram_enabled;
+                Ok(())
+            }
+            (Mbc::Mbc3(m), CartridgeState::Mbc3 { ram, rom_bank, ram_bank, ram_enabled,
+                ram_rtc_select, rtc, rtc_latched, latch_step, rtc_cycles }) => {
+                m.ram            = ram;
+                m.rom_bank       = rom_bank;
+                m.ram_bank       = ram_bank;
+                m.ram_enabled    = ram_enabled;
+                m.ram_rtc_select = ram_rtc_select;
+                m.rtc            = rtc;
+                m.rtc_latched    = rtc_latched;
+                m.latch_step     = latch_step;
+                m.rtc_cycles     = rtc_cycles;
+                Ok(())
+            }
+            (Mbc::Mbc5(m), CartridgeState::Mbc5 { ram, rom_bank_lo, rom_bank_hi, ram_bank, ram_enabled }) => {
+                m.ram         = ram;
+                m.rom_bank_lo = rom_bank_lo;
+                m.rom_bank_hi = rom_bank_hi;
+                m.ram_bank    = ram_bank;
+                m.ram_enabled = ram_enabled;
+                Ok(())
+            }
+            _ => Err("Save state MBC type does not match loaded cartridge".into()),
         }
     }
 }

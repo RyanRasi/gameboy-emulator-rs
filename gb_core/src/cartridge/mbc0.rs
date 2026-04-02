@@ -6,6 +6,8 @@
 //!
 //! No RAM, no bank switching. Writes to ROM space are silently ignored.
 
+use serde::{Serialize, Deserialize};
+
 pub struct Mbc0 {
     rom: Vec<u8>,
 }

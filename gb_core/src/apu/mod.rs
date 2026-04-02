@@ -7,11 +7,11 @@
 //!
 //! A high-pass filter (capacitor simulation) is applied per output channel
 //! to match DMG hardware behaviour and eliminate DC-offset pop/click artifacts.
-
 pub mod square;
 pub mod wave;
 pub mod noise;
 
+use serde::{Serialize, Deserialize};
 use noise::NoiseChannel;
 use square::SquareChannel;
 use wave::WaveChannel;
@@ -51,6 +51,7 @@ pub const NR51_ADDR: u16 = 0xFF25;
 pub const NR52_ADDR: u16 = 0xFF26;
 pub const WAVE_RAM_START: u16 = 0xFF30;
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Apu {
     pub ch1: SquareChannel,
     pub ch2: SquareChannel,
@@ -74,6 +75,7 @@ pub struct Apu {
     hp_cap_left:  f32,
     hp_cap_right: f32,
 
+    #[serde(skip)]
     pub sample_buffer: Vec<f32>,
     pub apu_enabled:   bool,
 }

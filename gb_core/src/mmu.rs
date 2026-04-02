@@ -24,21 +24,16 @@ pub const BIOS_SIZE: usize     = 0x0100;
 pub const ROM_BANK_SIZE: usize = 0x4000;
 
 pub struct Mmu {
-    bios:         [u8; BIOS_SIZE],
-    bios_active:  bool,
-
-    /// Loaded cartridge. None until `load_cartridge` is called.
-    cartridge:    Option<Cartridge>,
-
-    /// Fallback bare ROM buffer (used by tests that call load_rom directly).
-    bare_rom:     Vec<u8>,
-
-    vram: [u8; VRAM_SIZE],
-    wram: [u8; WRAM_SIZE],
-    oam:  [u8; OAM_SIZE],
-    io:   [u8; IO_SIZE],
-    hram: [u8; HRAM_SIZE],
-    ie:   u8,
+    pub(crate) bios:        [u8; BIOS_SIZE],
+    pub        bios_active: bool,
+    pub        cartridge:   Option<Cartridge>,
+    bare_rom:               Vec<u8>,
+    pub(crate) vram: [u8; VRAM_SIZE],
+    pub(crate) wram: [u8; WRAM_SIZE],
+    pub(crate) oam:  [u8; OAM_SIZE],
+    pub(crate) io:   [u8; IO_SIZE],
+    pub(crate) hram: [u8; HRAM_SIZE],
+    pub(crate) ie:   u8,
 }
 
 impl Mmu {

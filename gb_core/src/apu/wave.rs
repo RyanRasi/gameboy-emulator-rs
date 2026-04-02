@@ -8,7 +8,9 @@
 
 const WAVE_RAM_LEN: usize = 16; // 16 bytes = 32 nibbles
 
-#[derive(Clone, Debug)]
+use serde::{Serialize, Deserialize};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WaveChannel {
     pub enabled:        bool,
     pub dac_enabled:    bool,

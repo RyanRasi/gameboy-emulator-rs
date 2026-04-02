@@ -47,6 +47,9 @@ impl Button {
 
 /// Tracks the pressed/released state of all eight Game Boy buttons and
 /// generates the correct byte for register 0xFF00.
+use serde::{Serialize, Deserialize};
+
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Joypad {
     /// pressed[i] is true when Button with discriminant i is held down.
     pressed: [bool; 8],

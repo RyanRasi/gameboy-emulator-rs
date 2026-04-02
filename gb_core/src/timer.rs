@@ -35,6 +35,9 @@ pub fn tima_period(tac: u8) -> u32 {
     }
 }
 
+use serde::{Serialize, Deserialize};
+
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Timer {
     /// 16-bit internal divider counter.
     /// Increments every T-cycle; upper byte is the DIV register (0xFF04).

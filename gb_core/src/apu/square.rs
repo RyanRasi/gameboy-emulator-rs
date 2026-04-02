@@ -13,7 +13,9 @@ pub const DUTY_TABLE: [[u8; 8]; 4] = [
     [1, 1, 1, 1, 1, 1, 0, 0], // 75%
 ];
 
-#[derive(Clone, Debug)]
+use serde::{Serialize, Deserialize};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SquareChannel {
     /// Channel output active (cleared by length expiry or DAC power-off).
     pub enabled: bool,

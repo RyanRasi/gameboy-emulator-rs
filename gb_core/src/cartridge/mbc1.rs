@@ -16,15 +16,16 @@
 const ROM_BANK_SIZE: usize = 0x4000; // 16 KiB
 const RAM_BANK_SIZE: usize = 0x2000; //  8 KiB
 
-pub struct Mbc1 {
-    rom: Vec<u8>,
-    ram: Vec<u8>,
+use serde::{Serialize, Deserialize};
 
-    rom_bank_lo: u8, // 5-bit (bits 4–0)
-    rom_bank_hi: u8, // 2-bit (bits 6–5)
-    ram_bank:    u8, // 2-bit (used in RAM mode)
-    ram_enabled: bool,
-    mode:        u8, // 0 = ROM mode, 1 = RAM mode
+pub struct Mbc1 {
+    rom:             Vec<u8>,
+    pub(crate) ram:         Vec<u8>,
+    pub(crate) rom_bank_lo: u8,
+    pub(crate) rom_bank_hi: u8,
+    pub(crate) ram_bank:    u8,
+    pub(crate) ram_enabled: bool,
+    pub(crate) mode:        u8,
 }
 
 impl Mbc1 {

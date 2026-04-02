@@ -19,6 +19,8 @@
 //!   Bit 4 — C  Carry flag
 //!   Bits 3–0 are always zero
 
+use serde::{Serialize, Deserialize};
+
 /// Bitmasks for the F (flags) register.
 pub mod flags {
     pub const Z: u8 = 1 << 7; // Zero
@@ -27,10 +29,10 @@ pub mod flags {
     pub const C: u8 = 1 << 4; // Carry
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Registers {
     pub a: u8,
-    pub f: u8, // lower nibble is always 0
+    pub f: u8,
     pub b: u8,
     pub c: u8,
     pub d: u8,

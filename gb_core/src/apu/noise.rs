@@ -16,7 +16,9 @@
 //! the result is stored in bit 14 (and bit 6 in short mode), and the
 //! register is right-shifted.  The output is the inverted bit 0.
 
-#[derive(Clone, Debug)]
+use serde::{Serialize, Deserialize};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NoiseChannel {
     pub enabled:     bool,
     pub dac_enabled: bool,
