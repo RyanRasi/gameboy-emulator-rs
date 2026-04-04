@@ -1,4 +1,4 @@
-name: Rust
+name: Website Application
 
 on:
   push:
@@ -16,6 +16,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y pkg-config libasound2-dev
     - name: Build
       run: cargo build --verbose
     - name: Run web tests
