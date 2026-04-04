@@ -7,11 +7,24 @@ A modular, cycle-accurate Game Boy emulator written in Rust with desktop and web
 
 | App | Result |
 |--|--|
-| gb_core | ![Build - gb_core](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/gb_core_rust.yml?label=test)|
-| desktop | ![Build - desktop](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/desktop_rust.yml?label=test)|
-| web | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/web_rust.yml?label=test)|
+| gb_core | ![Build - gb_core](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/gb_core_rust.yml?label=)|
+| desktop | ![Build - desktop](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/desktop_rust.yml?label=)|
+| web | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/web_rust.yml?label=)|
 
- 
+| Blargg Test | Result |
+|--|--|
+| 01-special | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/01-special.yml?label=)|
+| 02-interrups | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/02-interrupts.yml?label=)|
+| 03-op sp,hl | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/03-op sp,hl.yml?label=)|
+| 04-op r,imm | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/04-op r,imm.yml?label=)|
+| 05-op rp | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/05-op rp.yml?label=)|
+| 06-ld r,r | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/06-ld r,r.yml?label=)|
+| 07-jr,jp,call,ret,rst | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/07-jr,jp,call,ret,rst.yml?label=)|
+| 08-misc instrs | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/08-misc instrs.yml?label=)|
+| 09-op r,r | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/09-op r,r.yml?label=)|
+| 10-bit ops | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/10-bit ops.yml?label=)|
+| 11-op a,(hl) | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/11-op a,(hl).yml?label=)|
+
 🎮 Preview
 
 (Add a GIF here later of Tetris and Pokémon Yellow running)
