@@ -15,15 +15,15 @@ A modular, cycle-accurate Game Boy emulator written in Rust with desktop and web
 |--|--|
 | 01-special | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/01-special.yml?label=)|
 | 02-interrups | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/02-interrupts.yml?label=)|
-| 03-op sp,hl | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/03-op sp,hl.yml?label=)|
-| 04-op r,imm | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/04-op r,imm.yml?label=)|
-| 05-op rp | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/05-op rp.yml?label=)|
-| 06-ld r,r | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/06-ld r,r.yml?label=)|
-| 07-jr,jp,call,ret,rst | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/07-jr,jp,call,ret,rst.yml?label=)|
-| 08-misc instrs | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/08-misc instrs.yml?label=)|
-| 09-op r,r | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/09-op r,r.yml?label=)|
-| 10-bit ops | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/10-bit ops.yml?label=)|
-| 11-op a,(hl) | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/11-op a,(hl).yml?label=)|
+| 03-op sp,hl | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/03-opsphl.yml?label=)|
+| 04-op r,imm | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/04-oprimm.yml?label=)|
+| 05-op rp | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/05-oprp.yml?label=)|
+| 06-ld r,r | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/06-ldrr.yml?label=)|
+| 07-jr,jp,call,ret,rst | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/07-jrjpcallretrst.yml?label=)|
+| 08-misc instrs | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/08-miscinstrs.yml?label=)|
+| 09-op r,r | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/09-oprr.yml?label=)|
+| 10-bit ops | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/10-bitops.yml?label=)|
+| 11-op a,(hl) | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/11-opahl.yml?label=)|
 
 🎮 Preview
 
@@ -155,18 +155,18 @@ When running in Desktop mode, use ```esc``` to quit
 	- [x] Implement ROM + BIOS upload endpoints
 	- [x] Run emulator instance headlessly
 	- [x] Serve frames (HTTP or WebSocket stream)
-- [ ] **Audio (APU)**
-	- [ ] Stub audio system (no sound)
-	- [ ] Implement basic sound channels (square, wave, noise)
-	- [ ] Output mixed audio stream
-- [ ] **Testing & Validation**
-	- [ ] Run CPU test ROMs (instruction accuracy) Blargg's Tests
-	- [ ] Validate PPU output with test ROMs
-	- [ ] Add regression tests for stability
-- [ ] **Save States**
-	- [ ] Serialize emulator state (CPU, memory, PPU)
-	- [ ] Implement save/load state functions
-	- [ ] Ensure deterministic restore
+- [x] **Audio (APU)**
+	- [x] Stub audio system (no sound)
+	- [x] Implement basic sound channels (square, wave, noise)
+	- [x] Output mixed audio stream
+- [x] **Testing & Validation**
+	- [x] Run CPU test ROMs (instruction accuracy) Blargg's Tests
+	- [x] Validate PPU output with test ROMs
+	- [x] Add regression tests for stability
+- [x] **Save States**
+	- [x] Serialize emulator state (CPU, memory, PPU)
+	- [x] Implement save/load state functions
+	- [x] Ensure deterministic restore
 - [ ] **Colour Game Boy Upgrade**
 	- [ ] Mode detection
 	- [ ] VRAM banking
