@@ -12,6 +12,7 @@ use crate::input::Joypad;
 use crate::mmu::Mmu;
 use crate::ppu::Ppu;
 use crate::timer::Timer;
+use crate::serial::Serial;
 
 pub struct Cpu {
     pub regs:   Registers,
@@ -20,6 +21,7 @@ pub struct Cpu {
     pub ppu:    Ppu,
     pub joypad: Joypad,
     pub apu:    Apu,
+    pub serial: Serial,
     pub cycles: u64,
     pub ime:    bool,
     pub halted: bool,
@@ -34,6 +36,7 @@ impl Cpu {
             ppu:    Ppu::new(),
             joypad: Joypad::new(),
             apu:    Apu::new(),
+            serial: Serial::new(),
             cycles: 0,
             ime:    false,
             halted: false,
@@ -63,6 +66,15 @@ impl Cpu {
 
     fn step_peripherals(&mut self, cycles: u32) {
         self.mmu.tick_cartridge_rtc(cycles as u64);
+        {
+            let sc = self.mmu.read_byte(crate::serial::SC_ADDR);
+            if sc & 0x81 == 0x81 {
+                let sb = self.mmu.read_byte(crate::serial::SB_ADDR);
+                self.serial.on_sc_write(sb, sc);
+                // Clear transfer start bit so we don't capture it again next tick
+                self.mmu.write_byte(crate::serial::SC_ADDR, sc & !0x80);
+            }
+        }
         if self.timer.step(cycles, &mut self.mmu) {
             interrupts::request(&mut self.mmu, interrupts::source::TIMER);
         }
@@ -107,6 +119,7 @@ mod tests {
     use crate::timer::{TAC_ADDR, TIMA_ADDR, TMA_ADDR};
     use crate::ppu;
     use crate::input::{Button, JOYP_ADDR};
+    use crate::serial::{SB_ADDR, SC_ADDR};
 
     fn cpu_with_program(program: &[u8]) -> Cpu {
         let mut cpu = Cpu::new();
@@ -171,6 +184,45 @@ mod tests {
         cpu.button_press(Button::A);
         cpu.tick();
         assert_eq!(cpu.mmu.read_byte(JOYP_ADDR) & 0x01, 0);
+    }
+
+    // -- Serial Port --
+    
+    #[test]
+    fn test_serial_captures_byte_on_sc_write_0x81() {
+        let mut cpu = cpu_with_program(&[0x00u8; 4]);
+        cpu.mmu.write_byte(SB_ADDR, b'A');
+        cpu.mmu.write_byte(SC_ADDR, 0x81);
+        cpu.tick(); // step_peripherals detects the transfer
+        assert!(
+            cpu.serial.output.contains(&b'A'),
+            "Serial must capture 'A' when SC=0x81"
+        );
+    }
+
+    #[test]
+    fn test_serial_does_not_capture_without_transfer_start() {
+        let mut cpu = cpu_with_program(&[0x00u8; 4]);
+        cpu.mmu.write_byte(SB_ADDR, b'Z');
+        cpu.mmu.write_byte(SC_ADDR, 0x00); // no transfer
+        cpu.tick();
+        assert!(
+            !cpu.serial.output.contains(&b'Z'),
+            "Serial must not capture without SC bit 7"
+        );
+    }
+
+    #[test]
+    fn test_serial_accumulates_multiple_bytes() {
+        let mut cpu = cpu_with_program(&[0x00u8; 32]);
+        for &c in b"Hi" {
+            cpu.mmu.write_byte(SB_ADDR, c);
+            cpu.mmu.write_byte(SC_ADDR, 0x81);
+            cpu.tick();
+        }
+        let out = cpu.serial.output_str();
+        assert!(out.contains('H'), "Serial must contain 'H'");
+        assert!(out.contains('i'), "Serial must contain 'i'");
     }
 
     // ── APU integration ───────────────────────────────────────────────────────

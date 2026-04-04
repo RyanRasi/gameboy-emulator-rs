@@ -6,8 +6,9 @@ pub mod cpu;
 pub mod input;
 pub mod mmu;
 pub mod ppu;
-pub mod timer;
 pub mod save_state;
+pub mod timer;
+pub mod serial;
 
 pub fn version() -> &'static str {
     "gb-emulator-core 0.1.0"

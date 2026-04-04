@@ -3,5 +3,6 @@ members = [
     "gb_core",
     "desktop",
     "web",
+    "tests",
 ]
 resolver = "2"

@@ -356,17 +356,29 @@ impl Cpu {
 
             // ── Miscellaneous ─────────────────────────────────────────────────
             0x27 => { // DAA
-                let mut a = self.regs.a;
-                if !self.regs.flag_n() {
-                    if self.regs.flag_h() || (a & 0x0F) > 9  { a = a.wrapping_add(0x06); }
-                    if self.regs.flag_c() || a > 0x99         { a = a.wrapping_add(0x60); self.regs.set_flag_c(true); }
+                let n = self.regs.flag_n();
+                let h = self.regs.flag_h();
+                let c = self.regs.flag_c();
+                let mut a = self.regs.a as u16; // u16 avoids wrapping during checks
+
+                if !n {
+                    // After addition: fix low nibble first, then high
+                    if h || (a & 0x0F) > 9 { a += 0x06; }
+                    // Decide carry BEFORE adding 0x60 so the condition uses the
+                    // post-low-nibble-corrected value rather than the final result
+                    let new_c = c || a > 0x9F;
+                    if new_c { a += 0x60; }
+                    self.regs.set_flag_c(new_c);
                 } else {
-                    if self.regs.flag_h() { a = a.wrapping_sub(0x06); }
-                    if self.regs.flag_c() { a = a.wrapping_sub(0x60); }
+                    // After subtraction: C is preserved unchanged
+                    if h { a = a.wrapping_sub(0x06); }
+                    if c { a = a.wrapping_sub(0x60); }
+                    self.regs.set_flag_c(c);
                 }
-                self.regs.set_flag_z(a == 0);
+
+                self.regs.a = (a & 0xFF) as u8;
+                self.regs.set_flag_z(self.regs.a == 0);
                 self.regs.set_flag_h(false);
-                self.regs.a = a;
                 4
             }
             0x2F => { // CPL
