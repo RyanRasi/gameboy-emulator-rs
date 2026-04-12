@@ -63,11 +63,11 @@ A modular, cycle-accurate Game Boy emulator written in Rust with desktop and web
 
 ## 🌍 Targets
 
-✔ Game Boy (DMG) — primary focus
+✔ Game Boy (DMG)
 
-🚧 Save states — planned
+✔ Save states
 
-🚧 Game Boy Color (CGB) — planned
+✔ Game Boy Color (CGB)
 
 ## 🛠️ Setup
 
