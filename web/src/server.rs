@@ -43,7 +43,7 @@ pub struct FrameResponse {
     /// Base64-encoded framebuffer: 160×144 bytes, shade 0–3 per pixel.
     pub framebuffer: String,
     /// Total width in pixels.
-    pub width:  usize,
+    pub width: usize,
     /// Total height in pixels.
     pub height: usize,
 }
@@ -52,30 +52,50 @@ pub struct FrameResponse {
 pub struct StatusResponse {
     pub status: String,
     pub has_rom: bool,
+    pub cgb_mode: bool,
+    pub palette: String,
+}
+
+// ── Palette response ──────────────────────────────────────────────────────────
+
+#[derive(Serialize)]
+pub struct PaletteResponse {
+    pub index: Option<usize>,
+    pub name: String,
+    pub count: usize,
 }
 
 // ── Button name parsing ───────────────────────────────────────────────────────
 
 pub fn parse_button(name: &str) -> Option<Button> {
     match name.to_lowercase().as_str() {
-        "a"      => Some(Button::A),
-        "b"      => Some(Button::B),
-        "start"  => Some(Button::Start),
+        "a" => Some(Button::A),
+        "b" => Some(Button::B),
+        "start" => Some(Button::Start),
         "select" => Some(Button::Select),
-        "up"     => Some(Button::Up),
-        "down"   => Some(Button::Down),
-        "left"   => Some(Button::Left),
-        "right"  => Some(Button::Right),
-        _        => None,
+        "up" => Some(Button::Up),
+        "down" => Some(Button::Down),
+        "left" => Some(Button::Left),
+        "right" => Some(Button::Right),
+        _ => None,
     }
 }
 
 fn ok(msg: impl Into<String>) -> Json<OkResponse> {
-    Json(OkResponse { ok: true, message: Some(msg.into()) })
+    Json(OkResponse {
+        ok: true,
+        message: Some(msg.into()),
+    })
 }
 
 fn err_response(status: StatusCode, msg: impl Into<String>) -> (StatusCode, Json<OkResponse>) {
-    (status, Json(OkResponse { ok: false, message: Some(msg.into()) }))
+    (
+        status,
+        Json(OkResponse {
+            ok: false,
+            message: Some(msg.into()),
+        }),
+    )
 }
 
 // ── Route handlers ────────────────────────────────────────────────────────────
@@ -125,7 +145,7 @@ async fn post_frame(
         .map(|fb| {
             Json(FrameResponse {
                 framebuffer: B64.encode(&fb),
-                width:  gb_core::ppu::SCREEN_WIDTH,
+                width: gb_core::ppu::SCREEN_WIDTH,
                 height: gb_core::ppu::SCREEN_HEIGHT,
             })
         })
@@ -160,18 +180,59 @@ async fn post_release(
         .map_err(|e| err_response(StatusCode::CONFLICT, e))
 }
 
-async fn get_status(
-    State(state): State<SharedState>,
-) -> Json<StatusResponse> {
+async fn get_status(State(state): State<SharedState>) -> Json<StatusResponse> {
     let s = state.lock().unwrap();
     let status_str = match s.status {
-        EmulatorStatus::NoRom   => "no_rom",
-        EmulatorStatus::Ready   => "ready",
+        EmulatorStatus::NoRom => "no_rom",
+        EmulatorStatus::Ready => "ready",
         EmulatorStatus::Running => "running",
     };
     Json(StatusResponse {
-        status:  status_str.into(),
+        status: status_str.into(),
         has_rom: s.cpu.is_some(),
+        cgb_mode: s.is_cgb,
+        palette: s.palette_name(),
+    })
+}
+
+// ── Palette handlers ──────────────────────────────────────────────────────────
+
+async fn post_palette_next(State(state): State<SharedState>) -> Json<PaletteResponse> {
+    let mut s = state.lock().unwrap();
+    s.palette_next();
+    Json(PaletteResponse {
+        index: s.palette_index(),
+        name: s.palette_name(),
+        count: s.palette_count(),
+    })
+}
+
+async fn post_palette_prev(State(state): State<SharedState>) -> Json<PaletteResponse> {
+    let mut s = state.lock().unwrap();
+    s.palette_prev();
+    Json(PaletteResponse {
+        index: s.palette_index(),
+        name: s.palette_name(),
+        count: s.palette_count(),
+    })
+}
+
+async fn post_palette_game(State(state): State<SharedState>) -> Json<PaletteResponse> {
+    let mut s = state.lock().unwrap();
+    s.palette_game();
+    Json(PaletteResponse {
+        index: s.palette_index(),
+        name: s.palette_name(),
+        count: s.palette_count(),
+    })
+}
+
+async fn get_palette(State(state): State<SharedState>) -> Json<PaletteResponse> {
+    let s = state.lock().unwrap();
+    Json(PaletteResponse {
+        index: s.palette_index(),
+        name: s.palette_name(),
+        count: s.palette_count(),
     })
 }
 
@@ -179,13 +240,17 @@ async fn get_status(
 
 pub fn build_router(state: SharedState) -> Router {
     Router::new()
-        .route("/bios",            post(post_bios))
-        .route("/rom",             post(post_rom))
-        .route("/start",           post(post_start))
-        .route("/frame",           post(post_frame))
-        .route("/press/:btn",      post(post_press))
-        .route("/release/:btn",    post(post_release))
-        .route("/status",          get(get_status))
+        .route("/bios", post(post_bios))
+        .route("/rom", post(post_rom))
+        .route("/start", post(post_start))
+        .route("/frame", post(post_frame))
+        .route("/press/:btn", post(post_press))
+        .route("/release/:btn", post(post_release))
+        .route("/status", get(get_status))
+        .route("/palette/next", post(post_palette_next))
+        .route("/palette/prev", post(post_palette_prev))
+        .route("/palette/game", post(post_palette_game))
+        .route("/palette", get(get_palette))
         .layer(CorsLayer::permissive())
         .with_state(state)
 }
@@ -259,10 +324,7 @@ mod tests {
     #[tokio::test]
     async fn test_rom_upload_valid_succeeds() {
         let server = test_server();
-        let resp = server
-            .post("/rom")
-            .bytes(Bytes::from(make_rom(0x00)))
-            .await;
+        let resp = server.post("/rom").bytes(Bytes::from(make_rom(0x00))).await;
         resp.assert_status_ok();
         let body: serde_json::Value = resp.json();
         assert_eq!(body["ok"], true);
@@ -271,10 +333,7 @@ mod tests {
     #[tokio::test]
     async fn test_rom_upload_invalid_returns_400() {
         let server = test_server();
-        let resp = server
-            .post("/rom")
-            .bytes(Bytes::from(vec![0u8; 10]))
-            .await;
+        let resp = server.post("/rom").bytes(Bytes::from(vec![0u8; 10])).await;
         resp.assert_status(StatusCode::BAD_REQUEST);
     }
 
@@ -345,7 +404,7 @@ mod tests {
         resp.assert_status_ok();
         let body: serde_json::Value = resp.json();
         assert!(body["framebuffer"].is_string());
-        assert_eq!(body["width"],  160);
+        assert_eq!(body["width"], 160);
         assert_eq!(body["height"], 144);
     }
 
@@ -358,7 +417,8 @@ mod tests {
         let body: serde_json::Value = resp.json();
         let b64 = body["framebuffer"].as_str().unwrap();
         let decoded = B64.decode(b64).unwrap();
-        assert_eq!(decoded.len(), gb_core::ppu::FRAMEBUFFER_SIZE);
+        // RGB24: 3 bytes per pixel
+        assert_eq!(decoded.len(), gb_core::ppu::FRAMEBUFFER_SIZE * 3);
     }
 
     #[tokio::test]
@@ -370,7 +430,12 @@ mod tests {
         let body: serde_json::Value = resp.json();
         let b64 = body["framebuffer"].as_str().unwrap();
         let decoded = B64.decode(b64).unwrap();
-        assert!(decoded.iter().all(|&s| s <= 3), "All shades must be 0–3");
+        // RGB24: length must be FRAMEBUFFER_SIZE * 3
+        assert_eq!(
+            decoded.len(),
+            gb_core::ppu::FRAMEBUFFER_SIZE * 3,
+            "RGB24 framebuffer must be 160×144×3 bytes"
+        );
     }
 
     #[tokio::test]
@@ -429,7 +494,7 @@ mod tests {
         let server = test_server();
         server.post("/rom").bytes(Bytes::from(make_rom(0x00))).await;
         server.post("/start").await;
-        for btn in ["a","b","start","select","up","down","left","right"] {
+        for btn in ["a", "b", "start", "select", "up", "down", "left", "right"] {
             let resp = server.post(&format!("/press/{}", btn)).await;
             resp.assert_status_ok();
         }
@@ -440,14 +505,14 @@ mod tests {
     #[test]
     fn test_parse_button_all_valid_names() {
         for (name, expected) in [
-            ("a",      Button::A),
-            ("b",      Button::B),
-            ("start",  Button::Start),
+            ("a", Button::A),
+            ("b", Button::B),
+            ("start", Button::Start),
             ("select", Button::Select),
-            ("up",     Button::Up),
-            ("down",   Button::Down),
-            ("left",   Button::Left),
-            ("right",  Button::Right),
+            ("up", Button::Up),
+            ("down", Button::Down),
+            ("left", Button::Left),
+            ("right", Button::Right),
         ] {
             assert_eq!(parse_button(name), Some(expected), "Failed for '{}'", name);
         }
@@ -455,15 +520,15 @@ mod tests {
 
     #[test]
     fn test_parse_button_case_insensitive() {
-        assert_eq!(parse_button("A"),     Some(Button::A));
+        assert_eq!(parse_button("A"), Some(Button::A));
         assert_eq!(parse_button("START"), Some(Button::Start));
-        assert_eq!(parse_button("Up"),    Some(Button::Up));
+        assert_eq!(parse_button("Up"), Some(Button::Up));
     }
 
     #[test]
     fn test_parse_button_invalid_returns_none() {
-        assert_eq!(parse_button("turbo"),  None);
-        assert_eq!(parse_button(""),       None);
-        assert_eq!(parse_button("select2"),None);
+        assert_eq!(parse_button("turbo"), None);
+        assert_eq!(parse_button(""), None);
+        assert_eq!(parse_button("select2"), None);
     }
 }
