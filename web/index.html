@@ -1,98 +1,761 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>GB Emulator</title>
-  <style>
-    body { background: #1a1a1a; display: flex; flex-direction: column; align-items: center; font-family: monospace; color: white; }
-    canvas { image-rendering: pixelated; border: 2px solid #444; margin: 20px; }
-    button { margin: 4px; padding: 8px 16px; font-size: 14px; cursor: pointer; }
-    #controls { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px; }
-    #status { margin: 10px; color: #aaa; }
-    input[type=file] { margin: 10px; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Game Boy Emulator</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 24px 16px 40px;
+  background: #1a1a1a;
+  font-family: Arial, sans-serif;
+  transition: background 0.4s;
+}
+
+/* ── Upload area (shown before ROM loaded) ─────────────────────────── */
+#upload-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+#upload-label {
+  background: #333;
+  color: #ccc;
+  border: 2px dashed #555;
+  border-radius: 10px;
+  padding: 18px 32px;
+  cursor: pointer;
+  font-size: 14px;
+  text-align: center;
+  transition: background 0.2s;
+}
+#upload-label:hover { background: #444; }
+#rom-input { display: none; }
+#status-msg { color: #888; font-size: 13px; }
+
+/* ── Device shell ───────────────────────────────────────────────────── */
+#device {
+  position: relative;
+  user-select: none;
+  transition: all 0.5s;
+}
+
+/* ══ DMG-01 Styles ══════════════════════════════════════════════════ */
+body.dmg { background: #2a2a2a; }
+
+.dmg #shell {
+  width: 340px;
+  background: #C8BBAA;
+  border-radius: 12px 12px 60px 60px;
+  padding: 0 0 32px 0;
+  box-shadow:
+    inset -3px -4px 0 #A89880,
+    inset 3px 3px 0 #DDD0BC,
+    0 8px 32px rgba(0,0,0,0.6);
+  position: relative;
+}
+
+.dmg #top-bar {
+  background: #B8A898;
+  border-radius: 12px 12px 0 0;
+  padding: 8px 16px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.dmg #top-lines {
+  display: flex; gap: 4px; align-items: center; width: 100%; justify-content: center;
+}
+.dmg .top-line-red  { height: 2px; width: 80px; background: #CC3333; border-radius: 1px; }
+.dmg .top-line-blue { height: 2px; width: 80px; background: #3344AA; border-radius: 1px; }
+.dmg #dot-matrix-text {
+  font-size: 8px;
+  letter-spacing: 3px;
+  color: #888070;
+  font-weight: bold;
+  margin-top: 2px;
+}
+
+.dmg #screen-area {
+  background: #888070;
+  margin: 10px 20px;
+  border-radius: 6px;
+  padding: 12px;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.4);
+  position: relative;
+}
+.dmg #screen-bezel {
+  background: #555048;
+  border-radius: 4px;
+  padding: 8px;
+  box-shadow: inset 0 0 6px rgba(0,0,0,0.6);
+}
+.dmg canvas {
+  display: block;
+  width: 256px;
+  height: 232px;
+  image-rendering: pixelated;
+  background: #8BAC0F;
+}
+
+.dmg #battery-area {
+  position: absolute;
+  left: 32px;
+  top: 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.dmg #battery-label {
+  font-size: 7px;
+  color: #888070;
+  letter-spacing: 1px;
+  font-weight: bold;
+}
+#battery-led {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #444;
+  border: 1px solid #333;
+  transition: background 0.3s, box-shadow 0.3s;
+}
+#battery-led.on {
+  background: #ff2222;
+  box-shadow: 0 0 6px #ff4444, 0 0 2px #ff0000;
+}
+
+.dmg #brand-text {
+  text-align: center;
+  padding: 4px 0 8px;
+  font-size: 13px;
+  color: #443388;
+  font-weight: bold;
+  font-style: italic;
+  letter-spacing: 1px;
+}
+.dmg #brand-text span { font-size: 17px; font-family: serif; }
+
+.dmg #controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 24px;
+  margin-top: 4px;
+}
+
+/* DMG D-pad */
+.dmg #dpad {
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+.dmg .dpad-h {
+  position: absolute;
+  top: 50%; left: 0;
+  transform: translateY(-50%);
+  width: 80px; height: 26px;
+  background: #222;
+  border-radius: 3px;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.5), 0 1px 0 #444;
+}
+.dmg .dpad-v {
+  position: absolute;
+  left: 50%; top: 0;
+  transform: translateX(-50%);
+  width: 26px; height: 80px;
+  background: #222;
+  border-radius: 3px;
+  box-shadow: inset 2px 0 4px rgba(0,0,0,0.5), 0 1px 0 #444;
+}
+.dmg .dpad-center {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 26px; height: 26px;
+  background: #2a2a2a;
+  z-index: 2;
+  border-radius: 2px;
+}
+.dpad-btn {
+  position: absolute;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  z-index: 3;
+}
+.dmg .dpad-btn-up    { top:0;    left:27px; width:26px; height:27px; }
+.dmg .dpad-btn-down  { bottom:0; left:27px; width:26px; height:27px; }
+.dmg .dpad-btn-left  { left:0;   top:27px;  width:27px; height:26px; }
+.dmg .dpad-btn-right { right:0;  top:27px;  width:27px; height:26px; }
+.dpad-btn:active { opacity: 0.6; }
+
+/* DMG AB buttons */
+.dmg #ab-area {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  transform: rotate(-20deg);
+}
+.ab-btn {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  color: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dmg .ab-btn {
+  background: #C0325A;
+  box-shadow: 0 3px 0 #8A1A3A, 0 4px 8px rgba(0,0,0,0.4);
+}
+.dmg .ab-btn:active { box-shadow: 0 1px 0 #8A1A3A; transform: translateY(2px); }
+
+/* DMG select/start */
+.dmg #sys-row {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 0 8px;
+}
+.sys-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.dmg .sys-pill {
+  width: 40px; height: 12px;
+  background: #999;
+  border-radius: 6px;
+  box-shadow: inset 0 2px 3px rgba(0,0,0,0.4), 0 1px 0 #bbb;
+}
+.dmg .sys-pill:active { background: #777; }
+.sys-label {
+  font-size: 8px;
+  letter-spacing: 1px;
+  font-weight: bold;
+}
+.dmg .sys-label { color: #443388; }
+
+/* DMG speaker */
+.dmg #speaker {
+  position: absolute;
+  bottom: 48px; right: 28px;
+  display: flex;
+  gap: 4px;
+}
+.dmg .speaker-line {
+  width: 4px;
+  height: 28px;
+  background: #A89880;
+  border-radius: 2px;
+  box-shadow: inset 0 0 2px rgba(0,0,0,0.3);
+}
+
+/* DMG phones label */
+.dmg #phones-label {
+  text-align: center;
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: #888070;
+  font-weight: bold;
+  padding-bottom: 8px;
+}
+
+/* ══ GBC Styles ══════════════════════════════════════════════════════ */
+body.gbc { background: #1a0a2e; }
+
+.gbc #shell {
+  width: 320px;
+  background: #6B35B8;
+  border-radius: 18px 18px 80px 80px;
+  padding: 0 0 36px 0;
+  box-shadow:
+    inset -3px -4px 0 #4A2080,
+    inset 3px 3px 0 #9060D0,
+    0 8px 32px rgba(60,0,120,0.7);
+  position: relative;
+}
+
+.gbc #top-bar {
+  background: #5A2A9A;
+  border-radius: 18px 18px 0 0;
+  padding: 10px 16px 4px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.gbc #screen-area {
+  background: #111;
+  margin: 6px 20px 8px;
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: inset 0 2px 8px rgba(0,0,0,0.8);
+  position: relative;
+}
+.gbc canvas {
+  display: block;
+  width: 256px;
+  height: 232px;
+  image-rendering: pixelated;
+  background: #111;
+  border-radius: 4px;
+}
+
+.gbc #battery-area {
+  position: absolute;
+  left: 16px;
+  top: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.gbc #battery-label {
+  font-size: 7px;
+  color: #9070C0;
+  letter-spacing: 1px;
+  font-weight: bold;
+}
+
+.gbc #brand-text {
+  text-align: center;
+  padding: 6px 0 4px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 2px;
+}
+.gbc #brand-text .g1 { color: #E03030; }
+.gbc #brand-text .g2 { color: #E08030; }
+.gbc #brand-text .g3 { color: #D0C020; }
+.gbc #brand-text .g4 { color: #30B030; }
+.gbc #brand-text .g5 { color: #3080E0; }
+.gbc #brand-text .g6 { color: #9030D0; }
+.gbc #brand-text .g-white { color: #FFFFFF; font-size: 13px; }
+
+.gbc #controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 28px;
+}
+
+/* GBC D-pad */
+.gbc #dpad {
+  position: relative;
+  width: 72px;
+  height: 72px;
+}
+.gbc .dpad-h {
+  position: absolute;
+  top: 50%; left: 0;
+  transform: translateY(-50%);
+  width: 72px; height: 24px;
+  background: #4A2080;
+  border-radius: 3px;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+}
+.gbc .dpad-v {
+  position: absolute;
+  left: 50%; top: 0;
+  transform: translateX(-50%);
+  width: 24px; height: 72px;
+  background: #4A2080;
+  border-radius: 3px;
+  box-shadow: inset 2px 0 4px rgba(0,0,0,0.5);
+}
+.gbc .dpad-center {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 24px; height: 24px;
+  background: #3A1870;
+  z-index: 2;
+  border-radius: 2px;
+}
+.gbc .dpad-btn-up    { top:0;    left:24px; width:24px; height:24px; }
+.gbc .dpad-btn-down  { bottom:0; left:24px; width:24px; height:24px; }
+.gbc .dpad-btn-left  { left:0;   top:24px;  width:24px; height:24px; }
+.gbc .dpad-btn-right { right:0;  top:24px;  width:24px; height:24px; }
+
+/* GBC AB buttons */
+.gbc #ab-area { display: flex; gap: 10px; align-items: flex-end; }
+.gbc .ab-btn {
+  width: 36px; height: 36px;
+  background: #5A2A9A;
+  box-shadow: 0 3px 0 #3A1870, 0 4px 8px rgba(0,0,0,0.4);
+  color: rgba(255,255,255,0.3);
+  font-size: 11px;
+}
+.gbc .ab-btn:active { box-shadow: 0 1px 0 #3A1870; transform: translateY(2px); }
+
+/* GBC select/start */
+.gbc #sys-row {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  padding: 6px 0 4px;
+}
+.gbc .sys-pill {
+  width: 18px; height: 18px;
+  background: #1A0A30;
+  border-radius: 50%;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.6), 0 1px 0 #5A2A9A;
+}
+.gbc .sys-pill:active { background: #111; }
+.gbc .sys-label { color: #9070C0; }
+
+/* GBC speaker */
+.gbc #speaker {
+  position: absolute;
+  bottom: 52px; right: 20px;
+  display: grid;
+  grid-template-columns: repeat(5, 6px);
+  gap: 4px;
+}
+.gbc .speaker-dot {
+  width: 6px; height: 6px;
+  background: #4A2080;
+  border-radius: 50%;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
+}
+
+/* ── Palette controls ───────────────────────────────────────────────── */
+#palette-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  align-items: center;
+}
+.pal-btn {
+  padding: 6px 12px;
+  font-size: 11px;
+  font-family: monospace;
+  cursor: pointer;
+  border-radius: 6px;
+  border: none;
+  background: #333;
+  color: #aaa;
+  letter-spacing: 1px;
+}
+.pal-btn:hover { background: #444; color: #ddd; }
+.pal-btn:active { background: #555; }
+#pal-name {
+  font-size: 11px;
+  color: #666;
+  font-family: monospace;
+  min-width: 120px;
+  text-align: center;
+}
+</style>
 </head>
-<body>
-  <h2>Game Boy Emulator</h2>
-  <input type="file" id="romFile" accept=".gb,.gbc" />
-  <button onclick="startEmulator()">▶ Start</button>
-  <div id="status">No ROM loaded</div>
-  <canvas id="screen" width="160" height="144" style="width:480px;height:432px"></canvas>
+<body class="none">
 
-  <div id="controls">
-    <div></div>
-    <button onmousedown="press('up')"    onmouseup="release('up')">▲</button>
-    <div></div>
-    <div></div>
-    <button onmousedown="press('left')"  onmouseup="release('left')">◀</button>
-    <button onmousedown="press('down')"  onmouseup="release('down')">▼</button>
-    <button onmousedown="press('right')" onmouseup="release('right')">▶</button>
-    <div></div>
-    <button onmousedown="press('b')"      onmouseup="release('b')">B</button>
-    <button onmousedown="press('a')"      onmouseup="release('a')">A</button>
-    <button onmousedown="press('select')" onmouseup="release('select')">Select</button>
-    <button onmousedown="press('start')"  onmouseup="release('start')">Start</button>
+<div id="upload-area">
+  <label id="upload-label" for="rom-input">
+    📁 Click to load a ROM<br>
+    <span style="font-size:11px;opacity:0.6;">.gb (Game Boy) or .gbc (Game Boy Color)</span>
+  </label>
+  <input type="file" id="rom-input" accept=".gb,.gbc">
+  <div id="status-msg">No ROM loaded</div>
+</div>
+
+<div id="device" style="display:none;">
+  <div id="shell">
+
+    <!-- TOP BAR -->
+    <div id="top-bar">
+      <!-- DMG-only elements injected by JS -->
+    </div>
+
+    <!-- SCREEN -->
+    <div id="screen-area">
+      <div id="screen-bezel">
+        <canvas id="screen" width="160" height="144"></canvas>
+      </div>
+      <!-- Battery LED -->
+      <div id="battery-area">
+        <div id="battery-led"></div>
+        <div id="battery-label">BATTERY</div>
+      </div>
+    </div>
+
+    <!-- Brand text -->
+    <div id="brand-text"></div>
+
+    <!-- Main controls -->
+    <div id="controls-row">
+      <!-- D-pad -->
+      <div id="dpad">
+        <div class="dpad-h"></div>
+        <div class="dpad-v"></div>
+        <div class="dpad-center"></div>
+        <button class="dpad-btn dpad-btn-up"    onmousedown="press('up')"    onmouseup="release('up')"    ontouchstart="t(event,()=>press('up'))"    ontouchend="t(event,()=>release('up'))"></button>
+        <button class="dpad-btn dpad-btn-down"  onmousedown="press('down')"  onmouseup="release('down')"  ontouchstart="t(event,()=>press('down'))"  ontouchend="t(event,()=>release('down'))"></button>
+        <button class="dpad-btn dpad-btn-left"  onmousedown="press('left')"  onmouseup="release('left')"  ontouchstart="t(event,()=>press('left'))"  ontouchend="t(event,()=>release('left'))"></button>
+        <button class="dpad-btn dpad-btn-right" onmousedown="press('right')" onmouseup="release('right')" ontouchstart="t(event,()=>press('right'))" ontouchend="t(event,()=>release('right'))"></button>
+      </div>
+
+      <!-- A/B -->
+      <div id="ab-area">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+          <button class="ab-btn" onmousedown="press('b')" onmouseup="release('b')" ontouchstart="t(event,()=>press('b'))" ontouchend="t(event,()=>release('b'))">B</button>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+          <button class="ab-btn" onmousedown="press('a')" onmouseup="release('a')" ontouchstart="t(event,()=>press('a'))" ontouchend="t(event,()=>release('a'))">A</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SELECT / START -->
+    <div id="sys-row">
+      <button class="sys-btn" onmousedown="press('select')" onmouseup="release('select')" ontouchstart="t(event,()=>press('select'))" ontouchend="t(event,()=>release('select'))">
+        <div class="sys-pill"></div>
+        <span class="sys-label">SELECT</span>
+      </button>
+      <button class="sys-btn" onmousedown="press('start')" onmouseup="release('start')" ontouchstart="t(event,()=>press('start'))" ontouchend="t(event,()=>release('start'))">
+        <div class="sys-pill"></div>
+        <span class="sys-label">START</span>
+      </button>
+    </div>
+
+    <!-- Speaker (filled by JS) -->
+    <div id="speaker"></div>
+
   </div>
+</div>
 
-  <script>
-    const API = 'http://localhost:3000';
-    const canvas = document.getElementById('screen');
-    const ctx = canvas.getContext('2d');
-    const palette = [
-      [255,255,255], [170,170,170], [85,85,85], [0,0,0]
-    ];
-    let running = false;
+<!-- Palette controls (shown when running) -->
+<div id="palette-row" style="display:none;">
+  <button class="pal-btn" onclick="palPrev()">◀</button>
+  <div id="pal-name">—</div>
+  <button class="pal-btn" onclick="palNext()">▶</button>
+  <button class="pal-btn" onclick="palGame()" style="margin-left:4px;">GAME</button>
+</div>
 
-    document.getElementById('romFile').addEventListener('change', async e => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const data = await file.arrayBuffer();
-      const resp = await fetch(`${API}/rom`, { method:'POST', body: data });
-      const json = await resp.json();
-      document.getElementById('status').textContent = json.message || json.error;
-    });
+<script>
+const API = 'http://localhost:3000';
+const canvas = document.getElementById('screen');
+const ctx    = canvas.getContext('2d');
+const W = 160, H = 144;
 
-    async function startEmulator() {
-      const resp = await fetch(`${API}/start`, { method:'POST' });
-      const json = await resp.json();
-      document.getElementById('status').textContent = json.message;
-      if (resp.ok) { running = true; requestAnimationFrame(loop); }
+let running  = false;
+let loopId   = null;
+let isGBC    = false;
+
+const FRAME_MS = 1000 / 59.73;
+
+// ── Touch helper ─────────────────────────────────────────────────────
+function t(ev, fn) { ev.preventDefault(); fn(); }
+
+// ── Apply device skin ─────────────────────────────────────────────────
+function applySkin(gbc) {
+  isGBC = gbc;
+  document.body.className = gbc ? 'gbc' : 'dmg';
+
+  const topBar   = document.getElementById('top-bar');
+  const brand    = document.getElementById('brand-text');
+  const speaker  = document.getElementById('speaker');
+  const bezel    = document.getElementById('screen-bezel');
+
+  if (!gbc) {
+    // DMG top bar
+    topBar.innerHTML = `
+      <div id="top-lines">
+        <div class="top-line-red"></div>
+        <div class="top-line-blue"></div>
+      </div>
+      <div id="dot-matrix-text">DOT MATRIX WITH STEREO SOUND</div>`;
+    // DMG brand
+    brand.innerHTML = `Nintendo <span>GAME BOY</span><sup style="font-size:8px">TM</sup>`;
+    // DMG speaker (lines)
+    speaker.innerHTML = Array(6).fill('<div class="speaker-line"></div>').join('');
+    // DMG bezel
+    bezel.style.background = '#555048';
+    bezel.style.padding = '8px';
+    document.getElementById('battery-label').style.display = 'block';
+  } else {
+    // GBC top bar (just the power LED area)
+    topBar.innerHTML = `<div style="display:flex;align-items:center;gap:6px;">
+      <div id="power-dots" style="display:flex;gap:3px;align-items:center;">
+        <div id="battery-led" style="width:9px;height:9px;border-radius:50%;background:#444;border:1px solid #333;transition:background .3s,box-shadow .3s;"></div>
+        <div style="display:flex;gap:2px;">
+          <div style="width:6px;height:6px;border-radius:50%;background:#5A2A9A;"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:#5A2A9A;"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:#5A2A9A;"></div>
+        </div>
+      </div>
+      <span style="font-size:8px;color:#9070C0;letter-spacing:1px;font-weight:bold;">POWER</span>
+    </div>`;
+    // GBC brand (rainbow text)
+    brand.innerHTML = `<span class="g-white">GAME BOY </span><span class="g1">C</span><span class="g2">O</span><span class="g3">L</span><span class="g4">O</span><span class="g5">R</span>`;
+    // GBC speaker (dots grid 5x5)
+    let dots = '';
+    for (let i = 0; i < 25; i++) dots += '<div class="speaker-dot"></div>';
+    speaker.innerHTML = dots;
+    // GBC bezel
+    bezel.style.background = 'none';
+    bezel.style.padding = '0';
+    document.getElementById('battery-label').style.display = 'none';
+  }
+}
+
+// ── Battery LED ────────────────────────────────────────────────────────
+function setLed(on) {
+  // The LED may be inside top-bar for GBC, so query fresh each time
+  const led = document.getElementById('battery-led');
+  if (!led) return;
+  if (on) {
+    led.style.background = '#ff2222';
+    led.style.boxShadow  = '0 0 6px #ff4444, 0 0 2px #ff0000';
+  } else {
+    led.style.background = '#444';
+    led.style.boxShadow  = 'none';
+  }
+}
+
+// ── ROM upload ─────────────────────────────────────────────────────────
+document.getElementById('rom-input').addEventListener('change', async ev => {
+  const file = ev.target.files[0];
+  if (!file) return;
+
+  const ext = file.name.split('.').pop().toLowerCase();
+  const gbc = (ext === 'gbc');
+
+  document.getElementById('upload-area').style.display = 'none';
+  document.getElementById('device').style.display = 'block';
+  applySkin(gbc);
+
+  setStatus('Uploading…');
+
+  const data = await file.arrayBuffer();
+  try {
+    const resp = await fetch(`${API}/rom`, { method: 'POST', body: data });
+    const json = await resp.json();
+    if (resp.ok) {
+      setStatus(`Loaded: ${json.message}`);
+      await startEmulator();
+    } else {
+      setStatus(`Error: ${json.message}`);
     }
+  } catch (err) {
+    setStatus(`Upload failed: ${err.message}`);
+  }
+});
 
-    async function loop() {
-      if (!running) return;
-      const resp = await fetch(`${API}/frame`, { method:'POST' });
-      if (!resp.ok) { running = false; return; }
-      const { framebuffer } = await resp.json();
-
-      // Decode base64
-      const raw = atob(framebuffer);
-      const img = ctx.createImageData(160, 144);
-      for (let i = 0; i < raw.length; i++) {
-        const shade = raw.charCodeAt(i) & 3;
-        const [r,g,b] = palette[shade];
-        img.data[i*4]   = r;
-        img.data[i*4+1] = g;
-        img.data[i*4+2] = b;
-        img.data[i*4+3] = 255;
-      }
-      ctx.putImageData(img, 0, 0);
-      requestAnimationFrame(loop);
+// ── Start ──────────────────────────────────────────────────────────────
+async function startEmulator() {
+  try {
+    const resp = await fetch(`${API}/start`, { method: 'POST' });
+    const json = await resp.json();
+    if (resp.ok) {
+      running = true;
+      setLed(true);
+      document.getElementById('palette-row').style.display = 'flex';
+      const pr = await fetch(`${API}/palette`);
+      const pj = await pr.json();
+      setPalName(pj.name);
+      stopLoop();
+      scheduleFrame();
+    } else {
+      setStatus(`Start failed: ${json.message}`);
     }
+  } catch (err) {
+    setStatus(`Start failed: ${err.message}`);
+  }
+}
 
-    async function press(btn) {
-      await fetch(`${API}/press/${btn}`, { method:'POST' });
-    }
-    async function release(btn) {
-      await fetch(`${API}/release/${btn}`, { method:'POST' });
-    }
+// ── Frame loop ─────────────────────────────────────────────────────────
+function scheduleFrame() { loopId = setTimeout(loop, 0); }
+function stopLoop() { if (loopId) { clearTimeout(loopId); loopId = null; } }
 
-    // Keyboard support
-    const keyMap = {
-      'z':'a', 'x':'b', 'Enter':'start', 'Backspace':'select',
-      'ArrowUp':'up', 'ArrowDown':'down', 'ArrowLeft':'left', 'ArrowRight':'right'
-    };
-    document.addEventListener('keydown', e => { if (keyMap[e.key]) { e.preventDefault(); press(keyMap[e.key]); }});
-    document.addEventListener('keyup',   e => { if (keyMap[e.key]) { e.preventDefault(); release(keyMap[e.key]); }});
-  </script>
+async function loop() {
+  loopId = null;
+  if (!running) return;
+  const t0 = performance.now();
+  try {
+    const resp = await fetch(`${API}/frame`, { method: 'POST' });
+    if (!resp.ok) { running = false; setLed(false); return; }
+    const json = await resp.json();
+    drawRgb24(json.framebuffer);
+  } catch (err) {
+    running = false;
+    setLed(false);
+    return;
+  }
+  const wait = Math.max(0, FRAME_MS - (performance.now() - t0));
+  loopId = setTimeout(loop, wait);
+}
+
+// ── RGB24 draw ─────────────────────────────────────────────────────────
+function drawRgb24(b64) {
+  const raw = atob(b64);
+  const img = ctx.createImageData(W, H);
+  const d   = img.data;
+  for (let i = 0; i < W * H; i++) {
+    const s = i * 3, t = i * 4;
+    d[t]   = raw.charCodeAt(s);
+    d[t+1] = raw.charCodeAt(s+1);
+    d[t+2] = raw.charCodeAt(s+2);
+    d[t+3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+// ── Palette ────────────────────────────────────────────────────────────
+async function palNext() {
+  const r = await fetch(`${API}/palette/next`, { method:'POST' });
+  setPalName((await r.json()).name);
+}
+async function palPrev() {
+  const r = await fetch(`${API}/palette/prev`, { method:'POST' });
+  setPalName((await r.json()).name);
+}
+async function palGame() {
+  const r = await fetch(`${API}/palette/game`, { method:'POST' });
+  setPalName((await r.json()).name);
+}
+function setPalName(name) {
+  document.getElementById('pal-name').textContent = name;
+}
+
+// ── Buttons ────────────────────────────────────────────────────────────
+async function press(btn)   { if (running) await fetch(`${API}/press/${btn}`,   {method:'POST'}); }
+async function release(btn) { if (running) await fetch(`${API}/release/${btn}`, {method:'POST'}); }
+
+const keyMap = {
+  z:'a', x:'b', Enter:'start', Backspace:'select',
+  ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right'
+};
+document.addEventListener('keydown', ev => { const b=keyMap[ev.key]; if(b){ev.preventDefault();press(b);}});
+document.addEventListener('keyup',   ev => { const b=keyMap[ev.key]; if(b){ev.preventDefault();release(b);}});
+
+// ── Helpers ────────────────────────────────────────────────────────────
+function setStatus(msg) { document.getElementById('status-msg').textContent = msg; }
+
+// Draw placeholder screen
+ctx.fillStyle = '#8BAC0F';
+ctx.fillRect(0, 0, W, H);
+</script>
 </body>
 </html>

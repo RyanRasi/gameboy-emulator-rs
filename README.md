@@ -63,11 +63,11 @@ A modular, cycle-accurate Game Boy emulator written in Rust with desktop and web
 
 ## 🌍 Targets
 
-✔ Game Boy (DMG) — primary focus
+✔ Game Boy (DMG)
 
-🚧 Save states — planned
+✔ Save states
 
-🚧 Game Boy Color (CGB) — planned
+✔ Game Boy Color (CGB)
 
 ## 🛠️ Setup
 
@@ -168,11 +168,11 @@ When running in Desktop mode, use ```esc``` to quit
 	- [x] Implement save/load state functions
 	- [x] Ensure deterministic restore
 - [ ] **Colour Game Boy Upgrade**
-	- [ ] Mode detection
-	- [ ] VRAM banking
-	- [ ] WRAM banking
-	- [ ] Palette system
-	- [ ] Tile attributes
-	- [ ] PPU color rendering
-	- [ ] DMA (HDMA)
-	- [ ] Double-speed mode
+	- [x] Mode detection
+	- [x] VRAM banking
+	- [x] WRAM banking
+	- [x] Palette system
+	- [x] Tile attributes
+	- [x] PPU color rendering
+	- [x] DMA (HDMA)
+	- [x] Double-speed mode

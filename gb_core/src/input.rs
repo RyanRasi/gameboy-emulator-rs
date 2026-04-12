@@ -26,28 +26,34 @@ pub const JOYP_ADDR: u16 = 0xFF00;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Button {
     // Action buttons
-    A      = 0,
-    B      = 1,
+    A = 0,
+    B = 1,
     Select = 2,
-    Start  = 3,
+    Start = 3,
     // D-pad
-    Right  = 4,
-    Left   = 5,
-    Up     = 6,
-    Down   = 7,
+    Right = 4,
+    Left = 5,
+    Up = 6,
+    Down = 7,
 }
 
 impl Button {
     /// All eight buttons in order, for iteration.
     pub const ALL: [Button; 8] = [
-        Button::A, Button::B, Button::Select, Button::Start,
-        Button::Right, Button::Left, Button::Up, Button::Down,
+        Button::A,
+        Button::B,
+        Button::Select,
+        Button::Start,
+        Button::Right,
+        Button::Left,
+        Button::Up,
+        Button::Down,
     ];
 }
 
 /// Tracks the pressed/released state of all eight Game Boy buttons and
 /// generates the correct byte for register 0xFF00.
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Joypad {
@@ -62,7 +68,7 @@ pub struct Joypad {
 impl Joypad {
     pub fn new() -> Self {
         Joypad {
-            pressed:     [false; 8],
+            pressed: [false; 8],
             irq_pending: false,
         }
     }
@@ -95,23 +101,39 @@ impl Joypad {
     pub fn read_joyp(&self, mmu: &Mmu) -> u8 {
         let select = mmu.read_byte(JOYP_ADDR);
         let action_sel = select & 0x20 == 0; // bit 5 low → action group
-        let dpad_sel   = select & 0x10 == 0; // bit 4 low → d-pad group
+        let dpad_sel = select & 0x10 == 0; // bit 4 low → d-pad group
 
         // Start with all bits high (nothing pressed) + preserve select bits
         let mut lo: u8 = 0x0F;
 
         if action_sel {
-            if self.pressed[Button::A      as usize] { lo &= !0x01; }
-            if self.pressed[Button::B      as usize] { lo &= !0x02; }
-            if self.pressed[Button::Select as usize] { lo &= !0x04; }
-            if self.pressed[Button::Start  as usize] { lo &= !0x08; }
+            if self.pressed[Button::A as usize] {
+                lo &= !0x01;
+            }
+            if self.pressed[Button::B as usize] {
+                lo &= !0x02;
+            }
+            if self.pressed[Button::Select as usize] {
+                lo &= !0x04;
+            }
+            if self.pressed[Button::Start as usize] {
+                lo &= !0x08;
+            }
         }
 
         if dpad_sel {
-            if self.pressed[Button::Right as usize] { lo &= !0x01; }
-            if self.pressed[Button::Left  as usize] { lo &= !0x02; }
-            if self.pressed[Button::Up    as usize] { lo &= !0x04; }
-            if self.pressed[Button::Down  as usize] { lo &= !0x08; }
+            if self.pressed[Button::Right as usize] {
+                lo &= !0x01;
+            }
+            if self.pressed[Button::Left as usize] {
+                lo &= !0x02;
+            }
+            if self.pressed[Button::Up as usize] {
+                lo &= !0x04;
+            }
+            if self.pressed[Button::Down as usize] {
+                lo &= !0x08;
+            }
         }
 
         // Bits 7–6 open bus (1), bits 5–4 from select, bits 3–0 active-low
@@ -132,7 +154,7 @@ impl Joypad {
     pub fn sync(&mut self, mmu: &mut Mmu) -> bool {
         let current = mmu.read_byte(JOYP_ADDR);
         let updated = self.read_joyp(mmu);
-        mmu.write_byte(JOYP_ADDR, updated);
+        mmu.set_joyp(updated); // ← bypass write_io; preserve lower nibble
 
         // Joypad IRQ fires when any input bit transitions 1→0 (released→pressed)
         let newly_pressed = (!updated & current) & 0x0F;
@@ -143,7 +165,9 @@ impl Joypad {
 }
 
 impl Default for Joypad {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // =============================================================================
@@ -218,8 +242,11 @@ mod tests {
         let (mut joy, _) = setup();
         joy.press(Button::B);
         joy.irq_pending = false; // clear manually
-        joy.press(Button::B);   // already pressed
-        assert!(!joy.irq_pending, "Holding a pressed button must not re-trigger IRQ");
+        joy.press(Button::B); // already pressed
+        assert!(
+            !joy.irq_pending,
+            "Holding a pressed button must not re-trigger IRQ"
+        );
     }
 
     #[test]
@@ -251,7 +278,11 @@ mod tests {
         select_action(&mut mmu);
         let byte = joy.read_joyp(&mmu);
         // Bits 3–0 all high (nothing pressed), bit5=0 (selected), bit4=1, bits7-6=1
-        assert_eq!(byte & 0x0F, 0x0F, "All action bits must be high when nothing pressed");
+        assert_eq!(
+            byte & 0x0F,
+            0x0F,
+            "All action bits must be high when nothing pressed"
+        );
     }
 
     #[test]
@@ -440,7 +471,7 @@ mod tests {
         let (mut joy, mut mmu) = setup();
         select_action(&mut mmu);
         joy.press(Button::A);
-        joy.sync(&mut mmu);  // consume the press IRQ
+        joy.sync(&mut mmu); // consume the press IRQ
         joy.release(Button::A);
         let irq = joy.sync(&mut mmu);
         assert!(!irq, "sync must not fire IRQ on release");
@@ -461,7 +492,7 @@ mod tests {
         // so the output bits don't change → no IRQ
         let (mut joy, mut mmu) = setup();
         mmu.write_byte(JOYP_ADDR, 0xFF); // no group selected
-        joy.sync(&mut mmu);              // baseline
+        joy.sync(&mut mmu); // baseline
         joy.press(Button::A);
         let irq = joy.sync(&mut mmu);
         assert!(!irq, "No IRQ when group not selected (bit can't go 1→0)");

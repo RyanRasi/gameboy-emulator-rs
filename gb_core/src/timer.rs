@@ -79,7 +79,7 @@ impl Timer {
     pub fn step(&mut self, cycles: u32, mmu: &mut Mmu) -> bool {
         // ── DIV ──────────────────────────────────────────────────────────────
         self.div_counter = self.div_counter.wrapping_add(cycles as u16);
-        mmu.write_byte(DIV_ADDR, self.div());
+        mmu.set_div(self.div());
 
         // ── TIMA ─────────────────────────────────────────────────────────────
         let tac = mmu.read_byte(TAC_ADDR);

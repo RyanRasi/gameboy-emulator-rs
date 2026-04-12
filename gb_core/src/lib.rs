@@ -1,32 +1,21 @@
-//! Game Boy DMG emulator core — pure logic, zero I/O dependencies.
+//! Game Boy DMG/CGB emulator core — pure logic, zero I/O dependencies.
 
 pub mod apu;
 pub mod cartridge;
 pub mod cpu;
+pub mod gbc_bios_palettes;
 pub mod input;
 pub mod mmu;
 pub mod ppu;
 pub mod save_state;
-pub mod timer;
 pub mod serial;
+pub mod timer;
 
-pub fn version() -> &'static str {
-    "gb-emulator-core 0.1.0"
-}
+pub fn version() -> &'static str { "gb-emulator-core 0.2.0" }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
-    fn test_framework_is_working() {
-        assert!(true == true);
-    }
-
-    #[test]
-    fn test_version_string() {
-        let v = version();
-        assert!(!v.is_empty());
-        assert!(v.contains("core"));
-    }
+    fn test_version() { assert!(version().contains("core")); }
 }
