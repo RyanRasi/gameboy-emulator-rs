@@ -11,14 +11,27 @@ env:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
+
     - name: Install dependencies
       run: sudo apt-get update && sudo apt-get install -y pkg-config libasound2-dev
+
+    - name: Cache gb-test-roms
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: gb-test-roms
+        key: gb-test-roms-v1
+
+    - name: Clone test ROMs (shallow)
+      if: steps.cache.outputs.cache-hit != 'true'
+      run: git clone --depth 1 https://github.com/retrio/gb-test-roms.git
+
     - name: Build
       run: cargo build --verbose
+
     - name: Run tests
-      run: cargo run -p blargg_tests -- tests/roms/cpu_instrs/individual/02-interrupts.gb
+      run: cargo run -p blargg_tests -- gb-test-roms/cpu_instrs/individual/02-interrupts.gb

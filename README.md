@@ -11,19 +11,21 @@ A modular, cycle-accurate Game Boy emulator written in Rust with desktop and web
 | desktop | ![Build - desktop](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/desktop_rust.yml?label=)|
 | web | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/web_rust.yml?label=)|
 
-| Blargg Test | Result |
-|--|--|
-| 01-special | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/01-special.yml?label=)|
-| 02-interrups | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/02-interrupts.yml?label=)|
-| 03-op sp,hl | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/03-opsphl.yml?label=)|
-| 04-op r,imm | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/04-oprimm.yml?label=)|
-| 05-op rp | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/05-oprp.yml?label=)|
-| 06-ld r,r | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/06-ldrr.yml?label=)|
-| 07-jr,jp,call,ret,rst | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/07-jrjpcallretrst.yml?label=)|
-| 08-misc instrs | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/08-miscinstrs.yml?label=)|
-| 09-op r,r | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/09-oprr.yml?label=)|
-| 10-bit ops | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/10-bitops.yml?label=)|
-| 11-op a,(hl) | ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/11-opahl.yml?label=)|
+## Blargg Test
+
+| cpu_instrs |
+|--|
+| ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/Blargg_cpu_instrs_01_special.yml?label=01-special) |
+| ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/Blargg_cpu_instrs_02_interrupts.yml?label=02-interrupts) |
+| ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/Blargg_cpu_instrs_03_op_sp_hl.yml?label=03-op%20sp%2Chl) |
+| ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/Blargg_cpu_instrs_04_op_r_imm.yml?label=04-op%20r%2Cimm) |
+| ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/Blargg_cpu_instrs_05_op_rp.yml?label=05-op%20rp) |
+| ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/Blargg_cpu_instrs_06_ld_r_r.yml?label=06-ld%20r%2Cr) |
+| ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/Blargg_cpu_instrs_07_jr_jp_call_ret_rst.yml?label=07-jr%2Cjp%2Ccall%2Cret%2Crst) |
+| ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/Blargg_cpu_instrs_08_misc_instrs.yml?label=08-misc%20instrs) |
+| ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/Blargg_cpu_instrs_09_op_r_r.yml?label=09-op%20r%2Cr) |
+| ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/Blargg_cpu_instrs_10_bit_ops.yml?label=10-bit%20ops) |
+| ![Build](https://img.shields.io/github/actions/workflow/status/RyanRasi/gameboy-emulator-rs/Blargg_cpu_instrs_11_op_a_hl.yml?label=11-op%20a%2C(hl)) |
 
 🎮 Preview
 
@@ -167,7 +169,7 @@ When running in Desktop mode, use ```esc``` to quit
 	- [x] Serialize emulator state (CPU, memory, PPU)
 	- [x] Implement save/load state functions
 	- [x] Ensure deterministic restore
-- [ ] **Colour Game Boy Upgrade**
+- [x] **Colour Game Boy Upgrade**
 	- [x] Mode detection
 	- [x] VRAM banking
 	- [x] WRAM banking
