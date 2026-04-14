@@ -99,16 +99,34 @@ cargo test -p web
 	cargo run -p web
 	```
 	Then open ```/web/index.html```
+	
+	or
+
+	c. WebAssembly
+
+	```
+	wasm-pack build wasm --target web --out-dir wasm/pkg
+	cd wasm
+	python3 -m http.server 8080
+	```
 
 ## 🕹️ Controls
 
-| Original GB control | Keyboard Mapping |
+| Original GB Controls | Keyboard Mapping |
 |--|--|
 | D-Pad | Arrow Keys |
 | A | Z |
 | B | X |
 | Start | Enter |
 | Select | Right Shift |
+
+| Emulator Controls | Keyboard Mapping |
+|--|--|
+| Cycle Colour Palette Left | F1 |
+| Cycle Colour Palette Right | F2 |
+| Reset Colour Palette to Original | F3 |
+| Save Game State | F5 |
+| Load Game State | F7 |
 
 When running in Desktop mode, use ```esc``` to quit
 
